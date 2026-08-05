@@ -28,3 +28,16 @@ def _isolated_disk_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     from a previous run silently replace what a cassette is supposed to be verifying.
     """
     monkeypatch.setattr("ranobelib.sdk.DEFAULT_CACHE_DIR", tmp_path / ".ranobelib_cache")
+
+
+@pytest.fixture(autouse=True)
+def _no_request_pacing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Zero out ApiClient's default inter-request delay for the test suite.
+
+    RanobeLib doesn't expose ``request_delay`` (rate-limiting knobs live on ApiClient only,
+    same as e.g. ``timeout`` — see docs/api-notes.md), so tests that make several requests
+    through one RanobeLib instance (get_volume() and friends) would otherwise wait through
+    the real default pacing delay for no benefit: that delay's own behavior is covered
+    directly and deterministically in tests/unit/test_client.py with an injected fake clock.
+    """
+    monkeypatch.setattr("ranobelib.client.DEFAULT_REQUEST_DELAY", 0.0)
