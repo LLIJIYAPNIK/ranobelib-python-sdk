@@ -81,6 +81,16 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
 Базовый URL: `https://api.cdnlibs.org/api`. Запросы идут без авторизации, 200 OK,
 CAPTCHA/Cloudflare не мешает базовым GET-запросам к `/api/manga/...`.
 
+`api.cdnlibs.org` общий для всей сети lib.social (mangalib, ranobelib, hentailib, ...).
+Эндпоинты тайтла и списка глав (`/api/manga/{slug_url}`, `/api/manga/{slug_url}/chapters`)
+требуют заголовок `Site-Id: 3` — без него (или с неверным значением) запрос по
+существующему тайтлу возвращает 404 с тем же телом, что и реально несуществующий тайтл,
+т.е. отличить эти случаи по ответу нельзя. У эндпоинта поиска/списка (`GET /api/manga`)
+другой механизм — query-параметр `site_id[]=3`, а не заголовок. Также на ошибочных статусах
+API отдаёт HTML-страницу сайта вместо JSON, если не передан заголовок
+`Accept: application/json`; на успешных ответах отдаёт JSON в любом случае. Подробности и
+проверенный список `fields[]` для метаданных тайтла — в `docs/api-notes.md`.
+
 Список глав тайтла:
 
 ```
