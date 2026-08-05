@@ -8,6 +8,7 @@ import pytest
 from ranobelib.client import ApiClient
 from ranobelib.exceptions import (
     AuthRequiredError,
+    ChapterNotFoundError,
     RanobeLibError,
     RateLimitError,
     TitleNotFoundError,
@@ -110,6 +111,51 @@ async def test_get_chapters_raises_title_not_found_on_404() -> None:
     async with _client(handler) as client:
         with pytest.raises(TitleNotFoundError):
             await client.get_chapters("1--missing")
+
+
+async def test_get_chapter_sends_number_and_volume_query_params() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/manga/1--example/chapter"
+        assert request.url.params["number"] == "51.6"
+        assert request.url.params["volume"] == "6"
+        assert "branch_id" not in request.url.params
+        return httpx.Response(200, json={"data": {"id": 1, "content": "<p>Hi.</p>"}})
+
+    async with _client(handler) as client:
+        data = await client.get_chapter("1--example", number="51.6", volume="6")
+
+    assert data == {"id": 1, "content": "<p>Hi.</p>"}
+
+
+async def test_get_chapter_sends_branch_id_when_given() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params["branch_id"] == "2251"
+        return httpx.Response(200, json={"data": {}})
+
+    async with _client(handler) as client:
+        await client.get_chapter("1--example", number="1", volume="1", branch_id=2251)
+
+
+async def test_get_chapter_raises_chapter_not_found_on_404() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"data": {"toast": {"message": "Not Found"}}})
+
+    async with _client(handler) as client:
+        with pytest.raises(ChapterNotFoundError) as exc_info:
+            await client.get_chapter("1--example", number="9999", volume="999")
+
+    assert exc_info.value.slug_url == "1--example"
+    assert exc_info.value.volume == "999"
+    assert exc_info.value.number == "9999"
+
+
+async def test_get_chapter_raises_auth_required_on_403() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, json={"data": {}})
+
+    async with _client(handler) as client:
+        with pytest.raises(AuthRequiredError):
+            await client.get_chapter("1--example", number="1", volume="1")
 
 
 async def test_aclose_without_context_manager() -> None:
