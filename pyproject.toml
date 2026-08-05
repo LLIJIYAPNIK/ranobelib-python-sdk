@@ -51,6 +51,10 @@ dev = [
     "ruff>=0.6",
     "vcrpy>=6.0",
 ]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.25",
+]
 
 [tool.ruff]
 line-length = 100
