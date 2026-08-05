@@ -7,9 +7,9 @@ The SDK talks to the undocumented but open JSON API behind the site (`api.cdnlib
 part of the lib.social network) instead of scraping HTML.
 
 > **Status:** early development. `RanobeLib.get_info()`, `get_table_of_contents()`,
-> `get_chapter()`, `get_volume()`, and `get_chapters()` (all without translation selection
-> yet) are implemented; everything else in the quickstart below is the intended public API
-> and not built yet — see `CLAUDE.md` for the planned roadmap.
+> `get_chapter()`, `get_volume()`, `get_chapters()`, and `get_volumes()` (all without
+> translation selection yet) are implemented; everything else in the quickstart below is
+> the intended public API and not built yet — see `CLAUDE.md` for the planned roadmap.
 
 ## Installation
 
