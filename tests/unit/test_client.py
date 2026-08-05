@@ -1,6 +1,8 @@
 """Unit tests for ranobelib.client.ApiClient, using a mock transport (no network)."""
 
+import asyncio
 from collections.abc import Callable
+from typing import Any
 
 import httpx
 import pytest
@@ -15,8 +17,13 @@ from ranobelib.exceptions import (
 )
 
 
-def _client(handler: Callable[[httpx.Request], httpx.Response]) -> ApiClient:
-    return ApiClient(transport=httpx.MockTransport(handler))
+async def _no_sleep(delay: float) -> None:
+    """Stand-in for asyncio.sleep in tests: skips real waiting for pacing/backoff delays."""
+
+
+def _client(handler: Callable[[httpx.Request], httpx.Response], **kwargs: Any) -> ApiClient:
+    kwargs.setdefault("sleep", _no_sleep)
+    return ApiClient(transport=httpx.MockTransport(handler), **kwargs)
 
 
 async def test_get_title_returns_data_payload() -> None:
@@ -165,3 +172,139 @@ async def test_aclose_without_context_manager() -> None:
     client = _client(handler)
     await client.get_title("1--example")
     await client.aclose()
+
+
+async def test_get_title_retries_on_429_then_succeeds() -> None:
+    responses = iter(
+        [
+            httpx.Response(429, headers={"Retry-After": "5"}, json={"data": {}}),
+            httpx.Response(200, json={"data": {"id": 1}}),
+        ]
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return next(responses)
+
+    async with _client(handler) as client:
+        data = await client.get_title("1--example")
+
+    assert data == {"id": 1}
+
+
+async def test_get_title_retries_on_5xx_then_succeeds() -> None:
+    responses = iter(
+        [httpx.Response(503, text="unavailable"), httpx.Response(200, json={"data": {}})]
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return next(responses)
+
+    async with _client(handler) as client:
+        await client.get_title("1--example")  # Doesn't raise.
+
+
+async def test_get_title_gives_up_after_max_retries() -> None:
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        return httpx.Response(429, json={"data": {}})
+
+    async with _client(handler, max_retries=2) as client:
+        with pytest.raises(RateLimitError):
+            await client.get_title("1--example")
+
+    assert attempts == 3  # Initial attempt plus 2 retries.
+
+
+async def test_retry_backoff_doubles_and_honors_retry_after() -> None:
+    delays: list[float] = []
+
+    async def recording_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    responses = iter(
+        [
+            httpx.Response(500, text="a"),
+            httpx.Response(500, text="b"),
+            httpx.Response(429, headers={"Retry-After": "9"}, json={"data": {}}),
+            httpx.Response(200, json={"data": {}}),
+        ]
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return next(responses)
+
+    async with _client(
+        handler, sleep=recording_sleep, max_retries=3, retry_base_delay=1.0, request_delay=0.0
+    ) as client:
+        await client.get_title("1--example")
+
+    assert delays == [1.0, 2.0, 9.0]
+
+
+async def test_retry_backoff_ignores_unparseable_retry_after() -> None:
+    delays: list[float] = []
+
+    async def recording_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    responses = iter(
+        [
+            httpx.Response(429, headers={"Retry-After": "not-a-number"}, json={"data": {}}),
+            httpx.Response(200, json={"data": {}}),
+        ]
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return next(responses)
+
+    async with _client(handler, sleep=recording_sleep, retry_base_delay=1.0) as client:
+        await client.get_title("1--example")
+
+    assert delays == [1.0]
+
+
+async def test_pace_waits_for_request_delay_between_calls() -> None:
+    delays: list[float] = []
+
+    async def recording_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    clock_values = iter([0.0, 0.0, 0.15, 0.15])
+
+    def fake_clock() -> float:
+        return next(clock_values)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": {}})
+
+    async with _client(
+        handler, sleep=recording_sleep, clock=fake_clock, request_delay=0.2
+    ) as client:
+        await client.get_title("1--a")
+        await client.get_title("1--b")
+
+    assert delays == [pytest.approx(0.05)]
+
+
+async def test_max_concurrency_limits_in_flight_requests() -> None:
+    in_flight = 0
+    max_in_flight = 0
+    lock = asyncio.Lock()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal in_flight, max_in_flight
+        async with lock:
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+        await asyncio.sleep(0.05)
+        async with lock:
+            in_flight -= 1
+        return httpx.Response(200, json={"data": {}})
+
+    async with _client(handler, max_concurrency=2, request_delay=0.0) as client:
+        await asyncio.gather(*(client.get_title(f"{i}--x") for i in range(5)))
+
+    assert max_in_flight == 2

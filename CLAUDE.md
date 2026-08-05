@@ -238,6 +238,16 @@ ranobelib-python-sdk/
   `ChapterNotFoundError`, `VolumeNotFoundError`, `MultipleTranslationsError`,
   `AuthRequiredError` (для 403/платного контента — понятная ошибка вместо падения), `RateLimitError`.
 
+Реализовано (`client.py`): выбрана ручная реализация, не `tenacity` — вся логика (семафор +
+пейсинг + backoff) укладывается в ~20 строк, `tenacity` добавил бы зависимость ради обёртки,
+которую пришлось бы дополнительно приспосабливать под "уважать `Retry-After`, если он есть,
+иначе экспоненциально" и под инъекцию `sleep`/`clock` для тестов без реального ожидания —
+см. `docs/api-notes.md` (раздел "Rate limiting и retry"). `ApiClient` — единственное место с
+этими настройками (`max_concurrency=5`, `request_delay=0.2s`, `max_retries=3`,
+`retry_base_delay=1.0s`, экспоненциально ×2 за попытку, `Retry-After` уважается при 429);
+`RanobeLib` их не пробрасывает — та же логика, что уже принята для `timeout`/`base_url`
+(`ApiClient`-only, не публичный контракт SDK).
+
 ## Экспорт
 
 Общий интерфейс в `exporters/__init__.py`:

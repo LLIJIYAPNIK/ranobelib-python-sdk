@@ -229,6 +229,47 @@ Per-chapter override for the bulk methods is left as a future enhancement if it 
 be needed; `get_chapter(..., branch_id=...)` already covers the single-chapter case the
 public API's quickstart shows it for.
 
+### Rate limiting и retry: ручная реализация вместо `tenacity`
+
+Роадмап (шаг 11) явно оставлял выбор между `tenacity` и ручной реализацией на усмотрение
+PR, с требованием задокументировать решение — вот оно.
+
+**Выбор: ручная реализация**, без новой зависимости. Причины:
+
+- Вся нужная логика — семафор на конкурентность, пейсинг между стартами запросов и
+  экспоненциальный backoff с уважением `Retry-After` — укладывается в три небольших метода
+  `ApiClient._get`/`_pace`/`_backoff_delay` (~30 строк). `tenacity` избавила бы от написания
+  цикла retry, но для остального (семафор, пейсинг, разбор `Retry-After`) всё равно нужен
+  свой код — выигрыш от зависимости небольшой.
+- Тестируемость без реального ожидания: `sleep`/`clock` — параметры конструктора
+  `ApiClient` (по умолчанию `asyncio.sleep`/`time.monotonic`), тесты подменяют их на
+  fake/recording-реализации и проверяют backoff/пейсинг мгновенно и детерминированно
+  (`tests/unit/test_client.py`), без монки патчинга `asyncio.sleep` глобально (что сломало
+  бы не связанные с этим тесты, использующие реальный `asyncio.sleep` для координации).
+- Ни одна из существующих кассет VCR не воспроизводит 429/5xx подряд, так что интеграционным
+  тестам retry не нужен — юнит-тесты полностью покрывают эту логику через `httpx.MockTransport`.
+
+**Реализация** (`ApiClient`, все параметры — только на уровне клиента, не пробрасываются
+через `RanobeLib`, аналогично `timeout`/`base_url`):
+
+- `max_concurrency=5` — `asyncio.Semaphore`, оборачивает сам HTTP-запрос (не время
+  ожидания backoff между попытками — семафор освобождается на время сна между ретраями,
+  чтобы долгий backoff одного запроса не блокировал слот для других).
+- `request_delay=0.2s` (`DEFAULT_REQUEST_DELAY` в `client.py`, дефолт можно переопределить
+  через `None`-сентинел в конструкторе) — минимальный интервал между стартами запросов,
+  даже при `max_concurrency > 1`; применяется на каждую попытку, включая ретраи.
+- `max_retries=3`, `retry_base_delay=1.0s`, экспонента ×2 за попытку (1s → 2s → 4s). На 429
+  сначала проверяется `Retry-After` (секунды); если заголовок есть и парсится — используется
+  он вместо экспоненты; если отсутствует или не парсится — обычный экспоненциальный backoff.
+- После исчерпания ретраев `_raise_for_status` работает как раньше (немедленно на первом
+  вызове до этой фичи): `RateLimitError`/`RanobeLibError` на итоговый ответ.
+
+Тестовый набор целиком глушит `request_delay` (через `ranobelib.client.DEFAULT_REQUEST_DELAY`,
+monkeypatch в `tests/conftest.py`) — `RanobeLib` не даёт способа передать `request_delay`
+per-instance, а без этого тесты вроде `get_volume()` на реальном тайтле с полусотней глав
+реально ждали бы ~10 секунд ради поведения, которое `test_client.py` и так проверяет точно
+и без ожидания через инъекцию fake `sleep`/`clock`.
+
 ## Open questions
 
 See the "Что НЕ проверено" section of `CLAUDE.md` for the current list: how a fractional
