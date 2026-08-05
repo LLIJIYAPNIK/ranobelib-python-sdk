@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import TracebackType
-from typing import Self
+from typing import Any, Self
 
 from ranobelib.client import ApiClient
 from ranobelib.exceptions import VolumeNotFoundError
@@ -111,8 +111,27 @@ class RanobeLib:
         Raises:
             VolumeNotFoundError: If the title has no chapters for this volume.
         """
-        volume_str = str(volume)
         raw_chapters = await self._client.get_chapters(self._slug_url)
+        return await self._build_volume(volume, raw_chapters)
+
+    async def get_volumes(self, volumes: list[int]) -> list[Volume]:
+        """Fetch several whole volumes, each including chapter content.
+
+        Fetches the chapter list once, shared across all requested volumes, then each
+        chapter individually and sequentially — same approach as ``get_volume``, applied
+        to more than one volume without re-fetching the chapter list per volume.
+
+        Args:
+            volumes: The volume numbers to fetch.
+
+        Raises:
+            VolumeNotFoundError: If the title has no chapters for one of the volumes.
+        """
+        raw_chapters = await self._client.get_chapters(self._slug_url)
+        return [await self._build_volume(volume, raw_chapters) for volume in volumes]
+
+    async def _build_volume(self, volume: int, raw_chapters: list[dict[str, Any]]) -> Volume:
+        volume_str = str(volume)
         numbers = [item["number"] for item in raw_chapters if item.get("volume") == volume_str]
         if not numbers:
             raise VolumeNotFoundError(self._slug_url, volume=volume_str)
