@@ -6,7 +6,7 @@ from types import TracebackType
 from typing import Self
 
 from ranobelib.client import ApiClient
-from ranobelib.models import Title
+from ranobelib.models import Chapter, Title, Volume
 from ranobelib.numbering import parse_slug_url
 
 _INFO_FIELDS = [
@@ -62,3 +62,17 @@ class RanobeLib:
         """Fetch title metadata: names, cover, summary, genres, tags, authors, teams."""
         data = await self._client.get_title(self._slug_url, fields=_INFO_FIELDS)
         return Title.model_validate(data)
+
+    async def get_table_of_contents(self) -> list[Volume]:
+        """Fetch the title's volumes and chapter names/numbers, without chapter content."""
+        raw_chapters = await self._client.get_chapters(self._slug_url)
+        chapters = [Chapter.model_validate(item) for item in raw_chapters]
+        return _group_into_volumes(chapters)
+
+
+def _group_into_volumes(chapters: list[Chapter]) -> list[Volume]:
+    """Group a flat, API-ordered chapter list into volumes, preserving that order."""
+    grouped: dict[str, list[Chapter]] = {}
+    for chapter in chapters:
+        grouped.setdefault(chapter.volume, []).append(chapter)
+    return [Volume(number=number, chapters=items) for number, items in grouped.items()]

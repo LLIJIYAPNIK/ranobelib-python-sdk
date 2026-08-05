@@ -91,6 +91,27 @@ async def test_get_title_wraps_other_error_statuses_in_ranobelib_error() -> None
             await client.get_title("1--broken")
 
 
+async def test_get_chapters_returns_data_array() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/manga/1--example/chapters"
+        assert request.headers["Site-Id"] == "3"
+        return httpx.Response(200, json={"data": [{"id": 1, "volume": "1", "number": "1"}]})
+
+    async with _client(handler) as client:
+        data = await client.get_chapters("1--example")
+
+    assert data == [{"id": 1, "volume": "1", "number": "1"}]
+
+
+async def test_get_chapters_raises_title_not_found_on_404() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"data": {"toast": {"message": "Not Found"}}})
+
+    async with _client(handler) as client:
+        with pytest.raises(TitleNotFoundError):
+            await client.get_chapters("1--missing")
+
+
 async def test_aclose_without_context_manager() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": {}})

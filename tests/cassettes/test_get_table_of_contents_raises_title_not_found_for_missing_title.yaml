@@ -1,0 +1,62 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - api.cdnlibs.org
+      site-id:
+      - '3'
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/manga/1--this-title-does-not-exist-zzz/chapters
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAEA6tWSkksSVSyqlYqyU8sLgEzKgtSlayUijNzUvNKlHSUclOLixPTQUJ++SUKbvml
+        eSlKtbW1AN/Kzk86AAAA
+    headers:
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Wed, 05 Aug 2026 14:29:08 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=9jqcSOL9dNnp3nwA; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
+        14:49:08 GMT
+      - __ddg10_=1785940148; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
+        14:49:08 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
+        14:49:08 GMT
+      - __ddg1_=jczRYScgkpkJ1ThvOdUl; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Thu,
+        05-Aug-2027 14:29:08 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '98'
+    status:
+      code: 404
+      message: Not Found
+version: 1

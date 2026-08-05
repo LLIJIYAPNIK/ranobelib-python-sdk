@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -117,3 +118,48 @@ class Title(BaseModel):
         if isinstance(value, dict):
             return _prosemirror_to_text(value)
         return str(value)
+
+
+class ChapterUser(BaseModel):
+    """The uploader of a chapter branch."""
+
+    id: int
+    username: str
+
+
+class ChapterBranch(BaseModel):
+    """A single team's (or solo uploader's) translation of a chapter.
+
+    A chapter has more than one branch when several teams have translated it
+    independently; see ``Chapter.branches_count``.
+    """
+
+    id: int
+    branch_id: int | None = None
+    created_at: datetime
+    teams: list[Team] = Field(default_factory=list)
+    user: ChapterUser
+
+
+class Chapter(BaseModel):
+    """A chapter's metadata: volume, number, name, and available translations.
+
+    Does not include chapter content — see ``RanobeLib.get_chapter()``.
+    """
+
+    id: int
+    volume: str
+    number: str
+    name: str | None = None
+    index: int
+    item_number: int
+    branches_count: int = 1
+    branches: list[ChapterBranch] = Field(default_factory=list)
+    bundle_id: int | None = None
+
+
+class Volume(BaseModel):
+    """A volume: its number and the chapters it contains, in title order."""
+
+    number: str
+    chapters: list[Chapter] = Field(default_factory=list)

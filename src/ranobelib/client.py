@@ -72,6 +72,20 @@ class ApiClient:
         data: dict[str, Any] = response.json()["data"]
         return data
 
+    async def get_chapters(self, slug_url: str) -> list[dict[str, Any]]:
+        """Fetch the raw chapter list for ``slug_url`` (single request, no pagination).
+
+        Args:
+            slug_url: The title's ``{id}--{slug}`` identifier.
+
+        Returns:
+            The ``data`` array from the API response.
+        """
+        response = await self._http.get(f"/manga/{slug_url}/chapters")
+        self._raise_for_status(response, slug_url=slug_url)
+        data: list[dict[str, Any]] = response.json()["data"]
+        return data
+
     def _raise_for_status(self, response: httpx.Response, *, slug_url: str) -> None:
         if response.status_code == 404:
             raise TitleNotFoundError(slug_url)
