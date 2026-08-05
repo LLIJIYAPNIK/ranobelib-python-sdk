@@ -425,6 +425,23 @@ CI не нужен.
 push в `main`. Тема — `mkdocs-material`, `mkdocstrings[python]` в отдельной dependency group
 `docs` (не `dev` — не нужна для lint/typecheck/test/build, `uv run --group docs mkdocs ...`).
 
+`.github/workflows/release.yml`: триггер — публикация GitHub Release (`on: release: types:
+[published]`), не `push` тега напрямую — публикация релиза через GitHub UI/`gh release
+create` даёт явный, осознанный момент "да, публикуем именно сейчас", в отличие от пуша тега,
+который легко сделать случайно. `uv publish` (не `pypa/gh-action-pypi-publish` — проект и так
+uv-first везде, лишний action не нужен) через Trusted Publishing (`--trusted-publishing
+automatic`, OIDC) — токен PyPI не хранится в секретах репозитория вообще. Job запускается в
+GitHub environment `pypi` (`environment: {name: pypi, url: ...}`), это должно совпадать с
+именем environment, указанным при регистрации trusted publisher на pypi.org (или там же
+оставить environment пустым, если сузить до конкретного environment не нужно). Requires
+`permissions: id-token: write` — без него OIDC-обмен с PyPI не пройдёт.
+
+**Важно**: Trusted Publishing нужно один раз настроить на стороне PyPI (pending trusted
+publisher — можно зарегистрировать даже до первого релиза, привязывается к
+owner/repo/workflow-file/environment) — это может сделать только владелец аккаунта PyPI,
+`release.yml` сам ничего не включает, только публикует после того, как настроено (та же
+модель, что и с GitHub Pages выше).
+
 Кэшировать `uv` (`astral-sh/setup-uv` с `enable-cache: true`) для скорости.
 
 ## Тестирование
@@ -474,5 +491,15 @@ push в `main`. Тема — `mkdocs-material`, `mkdocstrings[python]` в отд
     `ci.yml` (сейчас `--cov-report=xml` только пишет файл локально в раннере, никуда не
     отправляется) — задокументировать выбор инструмента для загрузки здесь же, когда
     реализовано.
+18. **Публикация на PyPI** — `.github/workflows/release.yml`, `uv publish` через PyPI
+    Trusted Publishing (OIDC, без хранения токена в секретах репозитория), триггер —
+    публикация GitHub Release. Имя пакета (`ranobelib-python-sdk`) на момент написания
+    свободно (проверено через `https://pypi.org/pypi/ranobelib-python-sdk/json` → 404).
+    Требует одноразовой настройки на стороне PyPI (pending trusted publisher — регистрируется
+    ещё до первого релиза, привязан к конкретным repo/workflow/environment), которую может
+    сделать только владелец аккаунта PyPI — Claude Code не может выполнить фактическую первую
+    публикацию сам, только подготовить workflow и объяснить, что нужно сделать вручную.
+    Бейдж PyPI (версия с pypi.org) в README до первого успешного релиза будет показывать
+    "not found" — это ожидаемо, как и с CI/docs бейджами до первого прогона.
 
 Каждый пункт — отдельная ветка/PR по правилам из раздела Git workflow.
