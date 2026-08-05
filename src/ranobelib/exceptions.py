@@ -13,7 +13,11 @@ class RanobeLibError(Exception):
 
 
 class TitleNotFoundError(RanobeLibError):
-    """Raised when a title cannot be found on ranobelib.me."""
+    """Raised when a title cannot be found on ranobelib.me.
+
+    Attributes:
+        slug_url: The title's ``{id}--{slug}`` identifier that couldn't be found.
+    """
 
     def __init__(self, slug_url: str) -> None:
         self.slug_url = slug_url
@@ -21,7 +25,13 @@ class TitleNotFoundError(RanobeLibError):
 
 
 class ChapterNotFoundError(RanobeLibError):
-    """Raised when a chapter cannot be found for a given volume/number."""
+    """Raised when a chapter cannot be found for a given volume/number.
+
+    Attributes:
+        slug_url: The title's ``{id}--{slug}`` identifier.
+        volume: The volume number that was requested.
+        number: The chapter number that was requested.
+    """
 
     def __init__(self, slug_url: str, *, volume: str, number: str) -> None:
         self.slug_url = slug_url
@@ -31,7 +41,12 @@ class ChapterNotFoundError(RanobeLibError):
 
 
 class VolumeNotFoundError(RanobeLibError):
-    """Raised when a title has no chapters for a given volume number."""
+    """Raised when a title has no chapters for a given volume number.
+
+    Attributes:
+        slug_url: The title's ``{id}--{slug}`` identifier.
+        volume: The volume number that was requested.
+    """
 
     def __init__(self, slug_url: str, *, volume: str) -> None:
         self.slug_url = slug_url
@@ -47,6 +62,13 @@ class MultipleTranslationsError(RanobeLibError):
     (see docs/api-notes.md) — returning it silently would be unpredictable. Call
     ``RanobeLib.get_translations()`` to list the available branches, then pass one's
     ``branch_id`` explicitly.
+
+    Attributes:
+        slug_url: The title's ``{id}--{slug}`` identifier.
+        volume: The chapter's volume number.
+        number: The chapter number.
+        branches: The chapter's available translations, as returned by
+            ``RanobeLib.get_translations()``.
     """
 
     def __init__(
@@ -72,7 +94,11 @@ def _describe_branch(branch: ChapterBranch) -> str:
 
 
 class AuthRequiredError(RanobeLibError):
-    """Raised when the requested content requires authorization (paid or early access)."""
+    """Raised when the requested content requires authorization (paid or early access).
+
+    Attributes:
+        url: The request URL that returned 403.
+    """
 
     def __init__(self, url: str) -> None:
         self.url = url
@@ -80,7 +106,11 @@ class AuthRequiredError(RanobeLibError):
 
 
 class RateLimitError(RanobeLibError):
-    """Raised when the API responds with 429 Too Many Requests."""
+    """Raised when the API responds with 429 Too Many Requests.
+
+    Attributes:
+        retry_after: The response's ``Retry-After`` value, in seconds, if it sent one.
+    """
 
     def __init__(self, retry_after: float | None = None) -> None:
         self.retry_after = retry_after
