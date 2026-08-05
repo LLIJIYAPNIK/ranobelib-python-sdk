@@ -361,6 +361,20 @@ pdf-специфичные тесты реально исполнялись та
   quickstart-пример (аналогичный блоку из раздела "Публичный API" выше), ссылка на полную
   документацию.
 
+Реализовано: `docs/index.md` — почти то же содержимое, что в README (по сути дублирует quickstart
+и статус, это нормально: README — витрина на GitHub, `docs/index.md` — landing страница
+сайта, аудитории разные, некоторое дублирование ожидаемо и не в тягость поддерживать, т.к.
+оба меняются вместе с публичным API). `docs/reference.md` — mkdocstrings-директивы (`:::
+ranobelib.Класс`) на все имена из `ranobelib.__all__` плюс `ranobelib.exporters.Exporter`/
+`register`/`EXPORTERS` (публичная точка расширения, но не ре-экспортируется из
+`ranobelib/__init__.py`, так что явно оговорено в тексте страницы, откуда импортировать).
+`docs/api-notes.md` уже существовал с самого начала проекта — просто добавлен в `nav`
+`mkdocs.yml`, без изменений по содержанию ради этого шага.
+
+**Важно**: GitHub Pages нужно один раз включить вручную в настройках репозитория
+(Settings → Pages → Source: "GitHub Actions") — `docs.yml` его не включает сам, только
+деплоит после того, как включено.
+
 ## Git workflow
 
 - Одна фича — одна ветка — один PR. Не смешивать несколько фич в одном PR.
@@ -391,9 +405,17 @@ CI не нужен.
 - job `typecheck`: `uv run mypy src`
 - job `test`: матрица по Python 3.11 / 3.12 / 3.13, `uv run pytest --cov=ranobelib --cov-report=xml --cov-fail-under=95`
 - job `build`: `uv build`, проверка, что пакет собирается
+- job `docs`: `uv run --group docs mkdocs build --strict` — не деплоит, только проверяет, что
+  сайт вообще собирается (`--strict` роняет билд на битых mkdocstrings-ссылках вроде `:::
+  ranobelib.ЧтоТоПереименованное`), чтобы сломанный `docs/reference.md` не всплывал только
+  постфактум в `docs.yml` после мержа в `main`.
 
-`.github/workflows/docs.yml`: сборка и деплой `mkdocs` на GitHub Pages при пуше в `main`
-(отдельно от `ci.yml`, не блокирует PR).
+`.github/workflows/docs.yml`: отдельный workflow (не блокирует PR, только `push` в `main` +
+`workflow_dispatch`), деплоит через официальный Pages-flow (`actions/upload-pages-artifact` +
+`actions/deploy-pages`, не `mkdocs gh-deploy`/ветка `gh-pages`) — Pages нужно один раз
+включить в настройках репозитория (Source = GitHub Actions), дальше деплоится сам на каждый
+push в `main`. Тема — `mkdocs-material`, `mkdocstrings[python]` в отдельной dependency group
+`docs` (не `dev` — не нужна для lint/typecheck/test/build, `uv run --group docs mkdocs ...`).
 
 Кэшировать `uv` (`astral-sh/setup-uv` с `enable-cache: true`) для скорости.
 

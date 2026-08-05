@@ -54,3 +54,14 @@ jobs:
         with:
           enable-cache: true
       - run: uv build
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+      # --strict turns broken cross-references (e.g. a docs/reference.md ::: pointing at a
+      # renamed/removed symbol) into a build failure instead of a silently broken page.
+      - run: uv run --group docs mkdocs build --strict
