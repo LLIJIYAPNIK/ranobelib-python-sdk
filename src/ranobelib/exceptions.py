@@ -25,6 +25,15 @@ class ChapterNotFoundError(RanobeLibError):
         super().__init__(f"Chapter not found: {slug_url!r} volume={volume!r} number={number!r}")
 
 
+class VolumeNotFoundError(RanobeLibError):
+    """Raised when a title has no chapters for a given volume number."""
+
+    def __init__(self, slug_url: str, *, volume: str) -> None:
+        self.slug_url = slug_url
+        self.volume = volume
+        super().__init__(f"Volume not found: {slug_url!r} volume={volume!r}")
+
+
 class AuthRequiredError(RanobeLibError):
     """Raised when the requested content requires authorization (paid or early access)."""
 
