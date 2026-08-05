@@ -1,10 +1,9 @@
 """Integration tests for ApiClient.get_chapter(), backed by VCR cassettes.
 
 These exercise the real api.cdnlibs.org API against chapters known (from manual research,
-see docs/api-notes.md) to use each of the two content formats the API returns. There is no
-public RanobeLib.get_chapter() facade yet — that lands with volume/number resolution and
-translation selection in a later roadmap step; this only exercises the client + content
-normalization built here.
+see docs/api-notes.md) to use each of the two content formats the API returns, at the
+client level (raw slug_url/number/volume strings). See test_get_chapter.py for the
+RanobeLib facade (int volume, translation selection still unimplemented).
 """
 
 import pytest

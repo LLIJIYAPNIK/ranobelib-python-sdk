@@ -69,6 +69,20 @@ class RanobeLib:
         chapters = [Chapter.model_validate(item) for item in raw_chapters]
         return _group_into_volumes(chapters)
 
+    async def get_chapter(self, volume: int, number: str) -> Chapter:
+        """Fetch a single chapter, including its content.
+
+        When a chapter has more than one team's translation, this returns whichever one
+        the API picks by default — translation selection is not implemented yet.
+
+        Args:
+            volume: The chapter's volume number.
+            number: The chapter number, as returned by the API — may contain a decimal
+                (e.g. ``"51.6"``).
+        """
+        data = await self._client.get_chapter(self._slug_url, number=number, volume=str(volume))
+        return Chapter.model_validate(data)
+
 
 def _group_into_volumes(chapters: list[Chapter]) -> list[Volume]:
     """Group a flat, API-ordered chapter list into volumes, preserving that order."""

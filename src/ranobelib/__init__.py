@@ -2,6 +2,7 @@
 
 from ranobelib.exceptions import (
     AuthRequiredError,
+    ChapterNotFoundError,
     RanobeLibError,
     RateLimitError,
     TitleNotFoundError,
@@ -12,6 +13,7 @@ from ranobelib.sdk import RanobeLib
 __all__ = [
     "AuthRequiredError",
     "Chapter",
+    "ChapterNotFoundError",
     "RanobeLib",
     "RanobeLibError",
     "RateLimitError",
