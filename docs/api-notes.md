@@ -168,12 +168,73 @@ numbers belong to the requested volume), then fetches each of those chapters ind
 same as calling `get_chapter()` in a loop. Sequential, not concurrent — no rate-limit/retry
 handling exists yet (roadmap step 11), so no concurrency control to bound it either.
 
+### Translation selection: `branch_id`, not `team_id`, and no reliable default
+
+Researched before implementing `get_translations()`/`MultipleTranslationsError`/`branch_id`
+(roadmap step 9), against `11407--solo-leveling`, which has 20 chapters with two competing
+translations (out of 275 total). Example: `volume=1, number=0` has two `branches` entries
+in the `/chapters` list response:
+
+```json
+{"id": 933688, "branch_id": 2251, "created_at": "2020-10-02...", "teams": [{"id": 13375, "name": "BerkuD13", ...}], "user": {"username": "Birdzz", "id": 1171713}}
+{"id": 269251, "branch_id": 635,  "created_at": "2019-04-11...", "teams": [], "user": {"username": "ItsEND", "id": 24545}}
+```
+
+Two things this confirms, both contradicting CLAUDE.md's original guess (the public API
+sketch used a `team_id` parameter, assumed equal to a `Team.id`):
+
+- **The selector the `/chapter` endpoint actually accepts is `branch_id`, not a team id.**
+  `branch_id` (`2251`/`635` above) is a stable id for a *translation line*, distinct from
+  both the branch entry's own `id` (a per-chapter-revision id, different on every chapter)
+  and `Team.id` (`13375` for BerkuD13). It doesn't always correspond to a team at all — the
+  second branch above has `"teams": []` (an uploader with no team credit), so a `team_id`
+  parameter couldn't even address it. The SDK's public API is corrected to use `branch_id`
+  throughout (`get_chapter(..., branch_id=...)`), same kind of correction as
+  `number_secondary` earlier in this file.
+- **The API's own default (`branch_id` omitted) is not "the first branch listed."**
+  Confirmed by requesting `volume=1, number=0` three ways:
+
+  | `branch_id` param | response `branch_id` | response `teams` |
+  |---|---|---|
+  | *(omitted)* | `635` | `[]` |
+  | `2251` | `2251` | `[{"name": "BerkuD13", ...}]` |
+  | `635` | `635` | `[]` |
+
+  Omitting `branch_id` returned `635` (branches[1], the *older* upload, 2019 vs 2020) — not
+  `branches[0]` (`2251`). The single-chapter response also carries no `branches`/
+  `branches_count` field to detect ambiguity after the fact (see the chapter-content section
+  above for its full shape) — the only way to know a chapter has more than one translation
+  is to check the `/chapters` list first.
+
+**Design decision** (CLAUDE.md's ТЗ explicitly leaves this choice to be made and documented
+here): since the API's own default isn't documented and the one example checked doesn't fit
+any obvious rule ("first in list", "newest", "has a credited team" all fail here), the SDK
+does not attempt to replicate or guess it. `get_chapter()` (and, since they build on it,
+`get_chapters()`/`get_volume()`/`get_volumes()`) raises `MultipleTranslationsError` when a
+chapter has more than one branch and `branch_id` wasn't given, instead of silently returning
+whichever one the API happens to default to. Callers use `get_translations()` to list the
+options and pick one explicitly.
+
+Cost of this: `get_chapter()` without an explicit `branch_id` now fetches the full
+`/chapters` list first (to check for ambiguity) before fetching the chapter itself — one
+extra request it didn't need before this feature, only when `branch_id` isn't already known.
+`get_chapters()`/`get_volume()`/`get_volumes()` already fetched that list for other reasons,
+so they get the ambiguity check for free. This cost is expected to shrink once the disk
+cache (roadmap step 10) makes repeated `/chapters` fetches for the same title free.
+
+`get_volume()`/`get_volumes()`/`get_chapters()` do not yet expose a way to pick a specific
+`branch_id` per chapter when fetching in bulk (their signatures don't have room for a
+per-chapter override) — they only raise if any chapter they touch turns out to be ambiguous.
+Per-chapter override for the bulk methods is left as a future enhancement if it turns out to
+be needed; `get_chapter(..., branch_id=...)` already covers the single-chapter case the
+public API's quickstart shows it for.
+
 ## Open questions
 
 See the "Что НЕ проверено" section of `CLAUDE.md` for the current list: how a fractional
 `number` affects the reading URL, illustration CDN structure for the `p`/`img`-only cases
 (confirmed to be `ranobelib.me` itself, not a separate CDN — see above, so this is largely
 resolved, but worth re-confirming CDN domain doesn't vary by title/region), paywall/403
-behavior, `/chapters` pagination for very large titles, default branch/team selection logic
-(see chapter-content section above), and reproducing `textAlign`/heading/list formatting
-from the prosemirror format if it turns out to matter for exports.
+behavior, `/chapters` pagination for very large titles, and reproducing `textAlign`/
+heading/list formatting from the prosemirror format if it turns out to matter for exports.
+Default branch/team selection is now resolved — see "Translation selection" above.
