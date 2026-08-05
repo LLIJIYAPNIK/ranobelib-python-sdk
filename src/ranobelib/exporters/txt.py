@@ -69,7 +69,7 @@ class TxtExporter:
 
     format: ClassVar[str] = "txt"
 
-    def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+    async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
         """Write ``chapters`` to ``output_path`` as plain text.
 
         Args:

@@ -143,7 +143,7 @@ class Fb2Exporter:
 
     format: ClassVar[str] = "fb2"
 
-    def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+    async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
         """Write ``chapters`` to ``output_path`` as FB2 XML.
 
         Args:
