@@ -6,8 +6,12 @@ from types import TracebackType
 from typing import Any, Self
 
 from ranobelib.client import ApiClient
-from ranobelib.exceptions import VolumeNotFoundError
-from ranobelib.models import Chapter, Title, Volume
+from ranobelib.exceptions import (
+    ChapterNotFoundError,
+    MultipleTranslationsError,
+    VolumeNotFoundError,
+)
+from ranobelib.models import Chapter, ChapterBranch, Title, Volume
 from ranobelib.numbering import parse_slug_url
 
 _INFO_FIELDS = [
@@ -70,33 +74,73 @@ class RanobeLib:
         chapters = [Chapter.model_validate(item) for item in raw_chapters]
         return _group_into_volumes(chapters)
 
-    async def get_chapter(self, volume: int, number: str) -> Chapter:
+    async def get_chapter(
+        self, volume: int, number: str, *, branch_id: int | None = None
+    ) -> Chapter:
         """Fetch a single chapter, including its content.
 
-        When a chapter has more than one team's translation, this returns whichever one
-        the API picks by default — translation selection is not implemented yet.
+        When a chapter has more than one team's translation and ``branch_id`` isn't given,
+        this raises ``MultipleTranslationsError`` rather than guessing — see
+        ``get_translations()`` and docs/api-notes.md for why the API's own default (when
+        ``branch_id`` is omitted) isn't relied on. Doing this check costs an extra request
+        to fetch the chapter list, only when ``branch_id`` isn't already given.
 
         Args:
             volume: The chapter's volume number.
             number: The chapter number, as returned by the API — may contain a decimal
                 (e.g. ``"51.6"``).
+            branch_id: Which translation to fetch, as returned by ``get_translations()``.
+                Only required when the chapter has more than one.
+
+        Raises:
+            MultipleTranslationsError: If the chapter has more than one translation and
+                ``branch_id`` wasn't given.
         """
-        data = await self._client.get_chapter(self._slug_url, number=number, volume=str(volume))
-        return Chapter.model_validate(data)
+        volume_str = str(volume)
+        if branch_id is None:
+            raw_chapters = await self._client.get_chapters(self._slug_url)
+            branch_id = self._resolve_branch_id(volume_str, number, raw_chapters)
+        return await self._fetch_chapter(volume_str, number, branch_id)
 
     async def get_chapters(self, chapters: list[tuple[int, str]]) -> list[Chapter]:
         """Fetch several chapters, including their content.
 
-        Each chapter is fetched with its own request to the single-chapter endpoint (see
-        ``get_chapter``), sequentially, in the order given.
+        Fetches the chapter list once, shared across all requested chapters (also used to
+        detect chapters with more than one translation — see ``get_chapter``), then each
+        chapter individually and sequentially, in the order given.
 
         Args:
             chapters: A list of ``(volume, number)`` pairs identifying each chapter.
 
         Raises:
             ChapterNotFoundError: If any requested chapter doesn't exist.
+            MultipleTranslationsError: If any requested chapter has more than one
+                translation.
         """
-        return [await self.get_chapter(volume, number) for volume, number in chapters]
+        raw_chapters = await self._client.get_chapters(self._slug_url)
+        result = []
+        for volume, number in chapters:
+            volume_str = str(volume)
+            branch_id = self._resolve_branch_id(volume_str, number, raw_chapters)
+            result.append(await self._fetch_chapter(volume_str, number, branch_id))
+        return result
+
+    async def get_translations(self, volume: int, number: str) -> list[ChapterBranch]:
+        """Fetch the available translations (branches) for a chapter.
+
+        Args:
+            volume: The chapter's volume number.
+            number: The chapter number.
+
+        Raises:
+            ChapterNotFoundError: If no chapter exists for this volume/number.
+        """
+        volume_str = str(volume)
+        raw_chapters = await self._client.get_chapters(self._slug_url)
+        item = _find_raw_chapter(raw_chapters, volume_str, number)
+        if item is None:
+            raise ChapterNotFoundError(self._slug_url, volume=volume_str, number=number)
+        return [ChapterBranch.model_validate(branch) for branch in item.get("branches") or []]
 
     async def get_volume(self, volume: int) -> Volume:
         """Fetch a whole volume: all its chapters, each including content.
@@ -110,6 +154,8 @@ class RanobeLib:
 
         Raises:
             VolumeNotFoundError: If the title has no chapters for this volume.
+            MultipleTranslationsError: If any of the volume's chapters has more than one
+                translation.
         """
         raw_chapters = await self._client.get_chapters(self._slug_url)
         return await self._build_volume(volume, raw_chapters)
@@ -126,6 +172,8 @@ class RanobeLib:
 
         Raises:
             VolumeNotFoundError: If the title has no chapters for one of the volumes.
+            MultipleTranslationsError: If any of the volumes' chapters has more than one
+                translation.
         """
         raw_chapters = await self._client.get_chapters(self._slug_url)
         return [await self._build_volume(volume, raw_chapters) for volume in volumes]
@@ -138,9 +186,33 @@ class RanobeLib:
 
         chapters = []
         for number in numbers:
-            data = await self._client.get_chapter(self._slug_url, number=number, volume=volume_str)
-            chapters.append(Chapter.model_validate(data))
+            branch_id = self._resolve_branch_id(volume_str, number, raw_chapters)
+            chapters.append(await self._fetch_chapter(volume_str, number, branch_id))
         return Volume(number=volume_str, chapters=chapters)
+
+    async def _fetch_chapter(self, volume_str: str, number: str, branch_id: int | None) -> Chapter:
+        data = await self._client.get_chapter(
+            self._slug_url, number=number, volume=volume_str, branch_id=branch_id
+        )
+        return Chapter.model_validate(data)
+
+    def _resolve_branch_id(
+        self, volume_str: str, number: str, raw_chapters: list[dict[str, Any]]
+    ) -> int | None:
+        item = _find_raw_chapter(raw_chapters, volume_str, number)
+        if item is None:
+            return None  # Let the chapter fetch itself raise ChapterNotFoundError.
+
+        branches = item.get("branches") or []
+        if len(branches) <= 1:
+            return None
+
+        raise MultipleTranslationsError(
+            self._slug_url,
+            volume=volume_str,
+            number=number,
+            branches=[ChapterBranch.model_validate(branch) for branch in branches],
+        )
 
 
 def _group_into_volumes(chapters: list[Chapter]) -> list[Volume]:
@@ -149,3 +221,17 @@ def _group_into_volumes(chapters: list[Chapter]) -> list[Volume]:
     for chapter in chapters:
         grouped.setdefault(chapter.volume, []).append(chapter)
     return [Volume(number=number, chapters=items) for number, items in grouped.items()]
+
+
+def _find_raw_chapter(
+    raw_chapters: list[dict[str, Any]], volume_str: str, number: str
+) -> dict[str, Any] | None:
+    """Find a chapter-list entry by volume/number, or ``None`` if there isn't one."""
+    return next(
+        (
+            item
+            for item in raw_chapters
+            if item.get("volume") == volume_str and item.get("number") == number
+        ),
+        None,
+    )
