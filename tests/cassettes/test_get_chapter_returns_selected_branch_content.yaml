@@ -1,0 +1,90 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - api.cdnlibs.org
+      site-id:
+      - '3'
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/manga/11407--solo-leveling/chapter?number=0&volume=1&branch_id=2251
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA71Y227bRhD9FZdPbSFLJHdlS0KaAkWQDwj6UDQKiBVJWawpUqVIJ67rfntn5wyT
+        IWSXauE0DzS5l5kzM2fObvQQZK51weohKLJgtTTmarGYBPs6y8tgFaQ7d2jzJpgEd3XZ7XMaiuij
+        6vYbGl0F4eeP5JindZW55r5f43j5ugtttPVPG/qnyfm5Ue+GjBzL7oY2wj99bxpXpbvEY4rjeUSI
+        XHXj+DuKbHg9CdImd22eJa6lfXEYh5dReBnGP0fRKr5eRYtpyP9+JWP5p0PRyNKqK0vE1/jtfeDk
+        oXQbjtkjGyBeMNbMPy0iiYH+gv+k+OCn5efcPyVcDtpe8TgM8axZBo/ksrjNj0ladxUFEUXLq0lQ
+        HBM/SsC2rjzmPHBX5B/VSB9Oe3+ggoSToM3d/his3qOGkTHX888ZpTrddlnU5zjpGl9XXnN5qSb7
+        intbvqio3k9+9xvendZ3vuQPwbYoc5l+9+aPt4s37+7jd7+UtKndES8qV3gPu7Y9HFfr2XrGG6dp
+        VpXF5jitm5v1rDuUtcuO65n3tp71MGTteqbtJmx1+tvhhjxk+dZ1pa/4y9mP5+EnMw/Fw54y/5WM
+        U8HvboMVGJgVx7RuyJl81hXRMaHEbkpV6vqQV4k0YfKxaHdElqrNqza5ze+/rG6bLn/8QF3TVVmZ
+        c5fALAZ6J4duUxbHHbcM5ltqs2Pp2qKukt87VxbtfUJ9UVTUjA+Bo4q7G9/015R7+XpbN3t0Do/e
+        1W1O3KP+4X7qwWIodZU3RxY8QupZer+pm8LveAi0c5emXeNSLx6WfFFvZ25TMB56O7QMkSaXNJln
+        hUeYbBkJwNIEpbc7gqJfgHuBOgXuR5/2Tt30nG+aespz+EiO0YpKLqVMhPjV4cIr7OXBUS4bd9hd
+        FlWWf/phHUTr4LXXhYHYQB4d6wW045rfZYQlxxo/NNBTKJJoFHQpxh8YhDApJYMOW2Xcmlfr2eH1
+        83hjwhteTNnsE5gHkj5iypCp9xw71BD6iHdA5VAMRlRwcnzMERvQ41zBNrxjs8gtluojCBMRJxGo
+        BfuHEdhWKhbDGlswSDosLOFswX8kuRyDRQyoIvzLWh06TMHsE0u57KcHqI1Os6GXymmlOAMAG6CU
+        3Tpn6XQkEfM+EUAsHgDjNK8hJuBBSoctAKJOTYkO45rmofBOUjvm99SjRVrRDtlYgFcSYKQTqRje
+        51xP/4c8TzTOnD+EKeqaZHHDACGwyEhzoz8EBGxpRAqwAbq5pJGNDRQETlCdAQYxOFlXnkGGqY/G
+        lP3StjoU1C/FEHZAzNCfmn8GHygomMCxi3HAwmZ9i5I6MiTs1R1owTUdpSgDIJ0jHEspDjxp30pq
+        7BYGnygEokDaFRDLOCXDHLvdjrHxGmwMHe+NEJw0kr5+Ki2xwhDVjfBp0+kUJDDSS2iMQQScVoSJ
+        5CLMAS/E2Y+0NtxsRgRj0QsG1EaggBkKtUFyUErQR/qW4QknGJjcqQFbmCakQEn+Mf8G4mfOIYIk
+        GtkC/3XnaJnvzQ6TyY0z0B+kVseEJAhJOf3oi/kYN5a9UsEmAtI9lf51MVKcKCQb/9dxvOLq4P4g
+        ag/kSrgGPFMdZOQkcaiwpj7vlovRkvOH7IL/sMFPa6Zjx3zkb2bfeiPDVsN+kBPUBeEwIl3JvvGe
+        f3fxJ6LVXESlUSGlbrhHQA3tdnURrmdRGI5Vzt/JXhQpx6WFHby10bmI/NXuqyGCXmrBAndO+ub8
+        DPo73Yvi1eiMZA18xQmejtXUX66+ZxqdFMNwuKD5QIkgOKAWUoIREFGkBK0nRMP8v6W0WEI82ine
+        4Vp3AjpP+oGDkj6HiTP0l35zUTcPoSZwwLh2ze/92QeZsCANIgVR+Gk1WDQyt6M150PLx2r5+R4J
+        BxlMq6wjHqkoUgOMOAkhX1u5img+wKDKgFjCmmevJWcdQ8iultfRYyjCHSUOI8sxxqgs6oF8y40E
+        kAGfF8n9Fu4WCFVgomOwFgnBKhlHNnUdwQX810qSKtcLrD3JINiBe4fJv+F6+t8M2taluz390uJ/
+        WPvw+Pg3KsQ+QigVAAA=
+    headers:
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Wed, 05 Aug 2026 19:19:42 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=6hB02zX6SBr4tocV; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
+        19:39:42 GMT
+      - __ddg10_=1785957582; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
+        19:39:42 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
+        19:39:42 GMT
+      - __ddg1_=UvNfNUkFuMeEHJU8uMTJ; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Thu,
+        05-Aug-2027 19:19:42 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '86'
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1
