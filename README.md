@@ -6,8 +6,9 @@ chapters and volumes, and export to epub, fb2, txt, or pdf.
 The SDK talks to the undocumented but open JSON API behind the site (`api.cdnlibs.org`,
 part of the lib.social network) instead of scraping HTML.
 
-> **Status:** project scaffolding only. No functionality has been implemented yet — see
-> `CLAUDE.md` for the planned roadmap.
+> **Status:** early development. `RanobeLib.get_info()` is implemented; everything else in
+> the quickstart below is the intended public API and not built yet — see `CLAUDE.md` for
+> the planned roadmap.
 
 ## Installation
 
@@ -44,7 +45,7 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
     await lib.export(chapters, fmt="epub", path="output.epub")
 ```
 
-This example describes the intended public API and does not work yet.
+Only `get_info()` works today; the rest of this example describes the intended public API.
 
 ## Documentation
 
