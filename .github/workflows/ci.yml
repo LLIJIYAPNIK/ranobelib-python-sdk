@@ -32,6 +32,15 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v7
+      # WeasyPrint (pdf exporter) needs these at import time, not just install time -- see
+      # docs/api-notes.md's "PDF export" notes. Without them, pdf-exporter tests skip
+      # instead of failing (see tests/unit/test_pdf_exporter.py), so CI would still pass
+      # but silently stop actually exercising that exporter.
+      - name: Install WeasyPrint system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libcairo2
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
