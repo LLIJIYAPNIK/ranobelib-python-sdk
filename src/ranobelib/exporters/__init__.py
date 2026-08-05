@@ -22,8 +22,12 @@ class Exporter(Protocol):
     format: ClassVar[str]
     """The registry key this exporter is selected by, e.g. ``"txt"``."""
 
-    def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+    async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
         """Write ``chapters`` (in the given order) to ``output_path``.
+
+        ``async`` since embedding illustrations (epub, pdf) requires downloading them —
+        the SDK is async-only throughout (see CLAUDE.md), so this can't drop to a sync
+        HTTP call. txt/fb2 do no I/O and just don't ``await`` anything in their bodies.
 
         Args:
             title: The chapters' parent title, for metadata (name, authors, ...).

@@ -90,7 +90,7 @@ def test_html_to_fb2_paragraphs_handles_empty_content() -> None:
     assert html_to_fb2_paragraphs("") == []
 
 
-def test_fb2_exporter_writes_well_formed_xml_with_expected_structure(tmp_path: Path) -> None:
+async def test_fb2_exporter_writes_well_formed_xml_with_expected_structure(tmp_path: Path) -> None:
     title = _title(
         name="My Novel",
         summary="First paragraph.\n\nSecond paragraph.",
@@ -102,7 +102,7 @@ def test_fb2_exporter_writes_well_formed_xml_with_expected_structure(tmp_path: P
     ]
     output_path = tmp_path / "out.fb2"
 
-    result = Fb2Exporter().export(title, chapters, output_path)
+    result = await Fb2Exporter().export(title, chapters, output_path)
 
     assert result == output_path
     tree = etree.parse(str(output_path))
@@ -140,11 +140,11 @@ def test_fb2_exporter_writes_well_formed_xml_with_expected_structure(tmp_path: P
     assert second_title.text == "Volume 1, Chapter 2"
 
 
-def test_fb2_exporter_handles_title_without_authors_or_summary(tmp_path: Path) -> None:
+async def test_fb2_exporter_handles_title_without_authors_or_summary(tmp_path: Path) -> None:
     title = _title(name="Bare Title")
     output_path = tmp_path / "out.fb2"
 
-    Fb2Exporter().export(title, [], output_path)
+    await Fb2Exporter().export(title, [], output_path)
 
     tree = etree.parse(str(output_path))
     root = tree.getroot()
@@ -153,12 +153,12 @@ def test_fb2_exporter_handles_title_without_authors_or_summary(tmp_path: Path) -
     assert root.findall("fb:body/fb:section", namespaces=_NSMAP) == []
 
 
-def test_fb2_exporter_handles_chapter_without_content(tmp_path: Path) -> None:
+async def test_fb2_exporter_handles_chapter_without_content(tmp_path: Path) -> None:
     title = _title()
     chapters = [_chapter(volume="1", number="1", name=None, content=None)]
     output_path = tmp_path / "out.fb2"
 
-    Fb2Exporter().export(title, chapters, output_path)
+    await Fb2Exporter().export(title, chapters, output_path)
 
     tree = etree.parse(str(output_path))
     section = tree.getroot().find("fb:body/fb:section", namespaces=_NSMAP)

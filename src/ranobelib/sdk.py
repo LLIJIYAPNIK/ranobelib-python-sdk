@@ -222,7 +222,7 @@ class RanobeLib:
             chapters: The chapters to include, in the order they should appear.
             path: Where to write the exported file.
             fmt: Export format — a key of ``ranobelib.exporters.EXPORTERS``
-                (currently: ``"txt"``).
+                (currently: ``"txt"``, ``"fb2"``, ``"epub"``).
 
         Raises:
             ValueError: If ``fmt`` isn't a registered export format.
@@ -232,7 +232,7 @@ class RanobeLib:
             available = ", ".join(sorted(EXPORTERS)) or "(none registered)"
             raise ValueError(f"Unknown export format {fmt!r}. Available: {available}")
         title = await self.get_info()
-        return exporter_cls().export(title, chapters, Path(path))
+        return await exporter_cls().export(title, chapters, Path(path))
 
     async def _build_volume(self, volume: int, raw_chapters: list[dict[str, Any]]) -> Volume:
         volume_str = str(volume)

@@ -40,7 +40,7 @@ def test_register_adds_class_to_registry_and_returns_it_unchanged() -> None:
     class _DummyExporter:
         format = "dummy-test-format"
 
-        def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+        async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
             return output_path
 
     try:
@@ -83,7 +83,7 @@ def test_html_to_text_handles_empty_content() -> None:
     assert html_to_text("") == ""
 
 
-def test_txt_exporter_writes_title_and_chapter_headings(tmp_path: Path) -> None:
+async def test_txt_exporter_writes_title_and_chapter_headings(tmp_path: Path) -> None:
     title = _title(name="My Novel")
     chapters = [
         _chapter(volume="1", number="1", name="Beginnings", content="<p>Once upon a time.</p>"),
@@ -91,7 +91,7 @@ def test_txt_exporter_writes_title_and_chapter_headings(tmp_path: Path) -> None:
     ]
     output_path = tmp_path / "out.txt"
 
-    result = TxtExporter().export(title, chapters, output_path)
+    result = await TxtExporter().export(title, chapters, output_path)
 
     assert result == output_path
     text = output_path.read_text(encoding="utf-8")
@@ -103,21 +103,21 @@ def test_txt_exporter_writes_title_and_chapter_headings(tmp_path: Path) -> None:
     assert "Continued." in text
 
 
-def test_txt_exporter_handles_chapter_without_content(tmp_path: Path) -> None:
+async def test_txt_exporter_handles_chapter_without_content(tmp_path: Path) -> None:
     title = _title()
     chapters = [_chapter(volume="1", number="1", name=None, content=None)]
     output_path = tmp_path / "out.txt"
 
-    TxtExporter().export(title, chapters, output_path)
+    await TxtExporter().export(title, chapters, output_path)
 
     assert output_path.read_text(encoding="utf-8").strip().endswith("Volume 1, Chapter 1")
 
 
 @pytest.mark.parametrize("chapters", [[]])
-def test_txt_exporter_handles_no_chapters(tmp_path: Path, chapters: list[Chapter]) -> None:
+async def test_txt_exporter_handles_no_chapters(tmp_path: Path, chapters: list[Chapter]) -> None:
     title = _title(name="Empty Book")
     output_path = tmp_path / "out.txt"
 
-    TxtExporter().export(title, chapters, output_path)
+    await TxtExporter().export(title, chapters, output_path)
 
     assert output_path.read_text(encoding="utf-8").strip() == "Empty Book"
