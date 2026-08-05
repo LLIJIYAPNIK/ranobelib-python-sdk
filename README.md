@@ -8,9 +8,10 @@ part of the lib.social network) instead of scraping HTML.
 
 > **Status:** early development. `RanobeLib.get_info()`, `get_table_of_contents()`,
 > `get_chapter()`, `get_volume()`, `get_chapters()`, `get_volumes()`, and
-> `get_translations()` (with `branch_id`-based translation selection) are implemented;
-> everything else in the quickstart below is the intended public API and not built yet —
-> see `CLAUDE.md` for the planned roadmap.
+> `get_translations()` (with `branch_id`-based translation selection) are implemented, with
+> raw API responses cached to disk (`cache_dir`/`cache_ttl` on the constructor,
+> `refresh=True` on individual fetches); everything else in the quickstart below is the
+> intended public API and not built yet — see `CLAUDE.md` for the planned roadmap.
 
 ## Installation
 
