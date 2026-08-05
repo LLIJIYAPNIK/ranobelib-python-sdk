@@ -6,15 +6,18 @@ chapters and volumes, and export to epub, fb2, txt, or pdf.
 The SDK talks to the undocumented but open JSON API behind the site (`api.cdnlibs.org`,
 part of the lib.social network) instead of scraping HTML.
 
-> **Status:** early development. `RanobeLib.get_info()`, `get_table_of_contents()`,
-> `get_chapter()`, `get_volume()`, `get_chapters()`, `get_volumes()`,
-> `get_translations()` (with `branch_id`-based translation selection), and
-> `export(chapters, fmt=..., path=...)` (`"txt"`, `"fb2"`, and `"epub"` with embedded cover
-> and illustrations) are implemented, with raw API responses cached to disk
-> (`cache_dir`/`cache_ttl` on the constructor, `refresh=True` on individual fetches) and the
-> underlying client bounding concurrency, pacing requests, and retrying 429/5xx with
-> backoff; everything else in the quickstart below (`pdf` export) is the intended public API
-> and not built yet — see `CLAUDE.md` for the planned roadmap.
+> **Status:** early development. All the calls in the quickstart below are implemented:
+> `RanobeLib.get_info()`, `get_table_of_contents()`, `get_chapter()`, `get_volume()`,
+> `get_chapters()`, `get_volumes()`, `get_translations()` (with `branch_id`-based
+> translation selection), and `export(chapters, fmt=..., path=...)` to `"txt"`, `"fb2"`,
+> `"epub"`, or `"pdf"` (cover + in-chapter illustrations embedded in epub/pdf). Raw API
+> responses are cached to disk (`cache_dir`/`cache_ttl` on the constructor, `refresh=True`
+> on individual fetches) and the underlying client bounds concurrency, paces requests, and
+> retries 429/5xx with backoff. `fmt="pdf"` needs WeasyPrint's native dependencies (Pango/
+> cairo/GTK3) installed on the system — `pip install`/`uv add` alone doesn't guarantee that
+> on every platform; without them, `export(fmt="pdf")` raises the same "unknown format"
+> error the other three formats don't. See `CLAUDE.md` for what's still ahead
+> (documentation).
 
 ## Installation
 
@@ -51,8 +54,7 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
     await lib.export(chapters, fmt="epub", path="output.epub")
 ```
 
-Only the calls listed under "Status" above work today; the rest of this example describes
-the intended public API.
+This is the full current public API — everything above is implemented and works today.
 
 ## Documentation
 
