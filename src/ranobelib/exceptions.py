@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ranobelib.models import ChapterBranch
+
 
 class RanobeLibError(Exception):
     """Base class for all errors raised by the SDK."""
@@ -32,6 +37,38 @@ class VolumeNotFoundError(RanobeLibError):
         self.slug_url = slug_url
         self.volume = volume
         super().__init__(f"Volume not found: {slug_url!r} volume={volume!r}")
+
+
+class MultipleTranslationsError(RanobeLibError):
+    """Raised when a chapter has more than one team's translation and none was selected.
+
+    The SDK does not guess a default: the API's own default when ``branch_id`` is omitted
+    is not simply the first branch listed, and the actual rule it uses isn't documented
+    (see docs/api-notes.md) — returning it silently would be unpredictable. Call
+    ``RanobeLib.get_translations()`` to list the available branches, then pass one's
+    ``branch_id`` explicitly.
+    """
+
+    def __init__(
+        self, slug_url: str, *, volume: str, number: str, branches: list[ChapterBranch]
+    ) -> None:
+        self.slug_url = slug_url
+        self.volume = volume
+        self.number = number
+        self.branches = branches
+        options = ", ".join(
+            f"branch_id={branch.branch_id} ({_describe_branch(branch)})" for branch in branches
+        )
+        super().__init__(
+            f"Multiple translations for {slug_url!r} volume={volume!r} number={number!r}: "
+            f"{options}. Pass branch_id to select one (see RanobeLib.get_translations())."
+        )
+
+
+def _describe_branch(branch: ChapterBranch) -> str:
+    if branch.teams:
+        return ", ".join(team.name for team in branch.teams)
+    return branch.user.username
 
 
 class AuthRequiredError(RanobeLibError):
