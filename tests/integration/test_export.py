@@ -4,6 +4,14 @@ Exercises the full pipeline through the public facade: fetching chapters, then e
 them with a registered exporter (currently "txt", "fb2", and "epub" — see exporters/txt.py,
 exporters/fb2.py, exporters/epub.py). VCR intercepts httpx globally, so it also records the
 epub exporter's own image-downloading client, not just the SDK's ApiClient.
+
+No VCR-backed test for "pdf" here: recording its cassette needs a machine where WeasyPrint's
+native dependencies actually work (this repo's Windows dev environment doesn't have them —
+see docs/api-notes.md's "PDF export" notes), and CI runs with --record-mode=none, so it
+can't record one either. tests/unit/test_pdf_exporter.py covers the full download-then-
+render pipeline instead, via an injected mock transport (no cassette needed) — it exercises
+the real WeasyPrint rendering path in any environment that has it (including CI, since
+ci.yml installs the needed system packages), just without going through RanobeLib itself.
 """
 
 import zipfile
@@ -61,6 +69,7 @@ async def test_export_writes_epub_file_with_fetched_chapters(tmp_path: Path) -> 
 
 async def test_export_raises_value_error_for_unknown_format(tmp_path: Path) -> None:
     # No @pytest.mark.vcr / cassette needed: an unknown fmt is rejected before any request.
+    # "docx", not "pdf": pdf is a real (if conditionally-registered) format now.
     async with RanobeLib("https://ranobelib.me/ru/book/91443--new-hero-in-dxd") as lib:
         with pytest.raises(ValueError, match="Unknown export format"):
-            await lib.export([], fmt="pdf", path=tmp_path / "output.pdf")
+            await lib.export([], fmt="docx", path=tmp_path / "output.docx")
