@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from ranobelib.exporters import register
+from ranobelib.exporters._shared import chapter_heading
 from ranobelib.models import Chapter, Title
 
 _BLOCK_TAGS = frozenset({"p", "div"})
@@ -62,11 +63,6 @@ def html_to_text(html_fragment: str) -> str:
     return parser.get_text()
 
 
-def _chapter_heading(chapter: Chapter) -> str:
-    heading = f"Volume {chapter.volume}, Chapter {chapter.number}"
-    return f"{heading}: {chapter.name}" if chapter.name else heading
-
-
 @register
 class TxtExporter:
     """Exports chapters as a single plain-text file, one heading per chapter."""
@@ -87,7 +83,7 @@ class TxtExporter:
         sections = [title.name]
         for chapter in chapters:
             body = html_to_text(chapter.content or "")
-            sections.append(f"{_chapter_heading(chapter)}\n\n{body}")
+            sections.append(f"{chapter_heading(chapter)}\n\n{body}")
 
         output_path.write_text("\n\n\n".join(sections) + "\n", encoding="utf-8")
         return output_path
