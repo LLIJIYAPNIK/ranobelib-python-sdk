@@ -61,6 +61,330 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
 
 This is the full current public API — everything above is implemented and works today.
 
+## Examples
+
+Every snippet below is a complete, self-contained script — save it as `example.py` and run
+`python example.py`. Each one really was run against the live site to produce the "Result"
+shown; only chapter content is truncated with `[:200]`/`[:300]` for readability, everything
+else is the real output verbatim.
+
+### Title metadata
+
+```python
+import asyncio
+
+from ranobelib import RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel") as lib:
+        info = await lib.get_info()
+        print(info.name)
+        print(info.rus_name)
+        print(info.status.label)
+        print(info.chapter_count)
+        print([genre.name for genre in info.genres[:5]])
+
+
+asyncio.run(main())
+```
+
+**Result:**
+
+```
+Haisukuru Di Di (Novel)
+Старшая школа D×D (Новелла)
+Завершён
+308
+['Боевик', 'Боевые искусства', 'Вампиры', 'Гарем', 'Драма']
+```
+
+### Table of contents
+
+```python
+import asyncio
+
+from ranobelib import RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/91443--new-hero-in-dxd") as lib:
+        volumes = await lib.get_table_of_contents()
+        for volume in volumes:
+            print(f"Volume {volume.number}: {len(volume.chapters)} chapters")
+        print(volumes[0].chapters[0].name)
+
+
+asyncio.run(main())
+```
+
+**Result:**
+
+```
+Volume 0: 1 chapters
+Volume 1: 46 chapters
+(НЕ ГОТОВО) Возможный гарем
+```
+
+### A single chapter
+
+```python
+import asyncio
+
+from ranobelib import RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/91443--new-hero-in-dxd") as lib:
+        chapter = await lib.get_chapter(volume=1, number="1")
+        print(chapter.name)
+        print(chapter.content[:200])
+
+
+asyncio.run(main())
+```
+
+**Result:**
+
+```
+Глава 1
+<p data-paragraph-index="1">"Наконец, я наконец-то могу вернуться." - говорю я с широкой
+улыбкой на лице, хотя по моим щекам текут слезы. Прошло слишком много времени с тех пор,
+как я застрял в этом м
+```
+
+### Several chapters at once
+
+```python
+import asyncio
+
+from ranobelib import RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/91443--new-hero-in-dxd") as lib:
+        chapters = await lib.get_chapters([(1, "1"), (1, "2")])
+        for chapter in chapters:
+            print(chapter.volume, chapter.number, len(chapter.content))
+
+
+asyncio.run(main())
+```
+
+**Result:**
+
+```
+1 1 30722
+1 2 22747
+```
+
+### A whole volume
+
+```python
+import asyncio
+
+from ranobelib import RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/91443--new-hero-in-dxd") as lib:
+        volume = await lib.get_volume(0)
+        print(volume.number, [chapter.number for chapter in volume.chapters])
+
+
+asyncio.run(main())
+```
+
+**Result:**
+
+```
+0 ['1']
+```
+
+### Several volumes at once
+
+```python
+import asyncio
+
+from ranobelib import RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/91443--new-hero-in-dxd") as lib:
+        volumes = await lib.get_volumes([0, 1])
+        for volume in volumes:
+            print(volume.number, len(volume.chapters))
+
+
+asyncio.run(main())
+```
+
+**Result:**
+
+```
+0 1
+1 46
+```
+
+### Selecting a translation
+
+`11407--solo-leveling` has two competing translations of its prologue. `get_chapter()`
+refuses to guess which one you want — it raises `MultipleTranslationsError` instead —
+unless `branch_id` is given explicitly, so you list the options with `get_translations()`
+first:
+
+```python
+import asyncio
+
+from ranobelib import MultipleTranslationsError, RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/11407--solo-leveling") as lib:
+        branches = await lib.get_translations(volume=1, number="0")
+        for branch in branches:
+            print(branch.branch_id, [team.name for team in branch.teams])
+
+        try:
+            await lib.get_chapter(volume=1, number="0")
+        except MultipleTranslationsError as exc:
+            print("ambiguous, pick one:", [b.branch_id for b in exc.branches])
+
+        chapter = await lib.get_chapter(volume=1, number="0", branch_id=branches[0].branch_id)
+        print(chapter.content[:60])
+
+
+asyncio.run(main())
+```
+
+**Result:**
+
+```
+2251 ['BerkuD13']
+635 ['Неизвестный']
+ambiguous, pick one: [2251, 635]
+<p data-paragraph-index="1">Прокачка уровня в одиночку</p><p data-paragraph-index="2">0 . Пролог</p
+```
+
+### Disk caching
+
+Raw API responses are cached to disk by default, so a repeated call for the same data
+doesn't re-fetch it:
+
+```python
+import asyncio
+import time
+
+from ranobelib import RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib(
+        "https://ranobelib.me/ru/book/91443--new-hero-in-dxd", cache_dir=".ranobelib_cache"
+    ) as lib:
+        start = time.perf_counter()
+        await lib.get_table_of_contents()
+        print(f"first call:  {time.perf_counter() - start:.3f}s (hits the API)")
+
+        start = time.perf_counter()
+        await lib.get_table_of_contents()
+        print(f"second call: {time.perf_counter() - start:.3f}s (served from disk cache)")
+
+        await lib.get_table_of_contents(refresh=True)  # Bypasses the cache explicitly.
+
+
+asyncio.run(main())
+```
+
+**Result** (your exact timings will vary, but the gap between the two calls won't):
+
+```
+first call:  0.318s (hits the API)
+second call: 0.001s (served from disk cache)
+```
+
+### Exporting to txt / fb2 / epub / pdf
+
+```python
+import asyncio
+
+from ranobelib import RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/91443--new-hero-in-dxd") as lib:
+        chapters = await lib.get_chapters([(1, "1"), (1, "2")])
+        for fmt in ("txt", "fb2", "epub", "pdf"):
+            path = f"output.{fmt}"
+            result = await lib.export(chapters, fmt=fmt, path=path)
+            print(fmt, "->", result)
+
+
+asyncio.run(main())
+```
+
+**Result** (file sizes from the real run — `pdf` needs
+[WeasyPrint's native dependencies](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation)
+installed; without them this raises `ValueError: Unknown export format 'pdf'. Available:
+epub, fb2, txt` instead of the line shown here):
+
+```
+txt -> output.txt      (84,044 bytes)
+fb2 -> output.fb2      (87,691 bytes)
+epub -> output.epub  (1,442,724 bytes, cover + illustrations embedded)
+pdf -> output.pdf      (cover + illustrations embedded, needs WeasyPrint)
+```
+
+`output.txt`'s first few lines, for a sense of the format:
+
+```
+New Hero in DxD
+
+
+Volume 1, Chapter 1: Глава 1
+
+"Наконец, я наконец-то могу вернуться." - говорю я с широкой улыбкой на лице, хотя по моим
+щекам текут слезы. Прошло слишком много времени с тех пор, как я застрял в этом месте, я
+больше не могу с этим справляться. Поначалу это было круто, но через нек...
+```
+
+### Error handling
+
+```python
+import asyncio
+
+from ranobelib import ChapterNotFoundError, RanobeLib, TitleNotFoundError
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/1--this-title-does-not-exist-zzz") as lib:
+        try:
+            await lib.get_info()
+        except TitleNotFoundError as exc:
+            print(exc)
+
+    async with RanobeLib("https://ranobelib.me/ru/book/91443--new-hero-in-dxd") as lib:
+        try:
+            await lib.get_chapter(volume=999, number="9999")
+        except ChapterNotFoundError as exc:
+            print(exc)
+
+
+asyncio.run(main())
+```
+
+**Result:**
+
+```
+Title not found: '1--this-title-does-not-exist-zzz'
+Chapter not found: '91443--new-hero-in-dxd' volume='999' number='9999'
+```
+
+`AuthRequiredError` (403, paid/early-access content) and `RateLimitError` (429 after
+retries are exhausted) follow the same pattern — see the
+[API reference](https://LLIJIYAPNIK.github.io/ranobelib-python-sdk/reference/) for every
+exception's attributes.
+
 ## Documentation
 
 Full API reference and guides: **<https://LLIJIYAPNIK.github.io/ranobelib-python-sdk/>**
