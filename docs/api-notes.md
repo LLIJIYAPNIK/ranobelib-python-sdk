@@ -156,6 +156,18 @@ format: passed through as-is; prosemirror format: rendered with the same tag voc
 `<p>`, `<img loading="lazy" src="...">`, `<strong>`, `<em>`, `<br />`, `<hr />` — so
 exporters only ever handle one shape), see `models.py`.
 
+### No bulk "volume content" endpoint
+
+Checked for a shortcut before implementing `get_volume()` (fetch a whole volume's chapters
+in fewer requests than one-per-chapter): `GET /api/manga/{slug}/volume?volume=1`,
+`GET /api/manga/{slug}/volumes` both 404. `GET /api/manga/{slug}/chapter?volume=1` (omitting
+`number`) returns **422** with `{"data": {"number": ["Поле number обязательно для
+заполнения."]}}` — `number` is a required parameter, confirming there's no way to fetch a
+volume's chapters in one call. `get_volume()` fetches the chapter list once (to find which
+numbers belong to the requested volume), then fetches each of those chapters individually,
+same as calling `get_chapter()` in a loop. Sequential, not concurrent — no rate-limit/retry
+handling exists yet (roadmap step 11), so no concurrency control to bound it either.
+
 ## Open questions
 
 See the "Что НЕ проверено" section of `CLAUDE.md` for the current list: how a fractional

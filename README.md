@@ -6,10 +6,10 @@ chapters and volumes, and export to epub, fb2, txt, or pdf.
 The SDK talks to the undocumented but open JSON API behind the site (`api.cdnlibs.org`,
 part of the lib.social network) instead of scraping HTML.
 
-> **Status:** early development. `RanobeLib.get_info()`, `get_table_of_contents()`, and
-> `get_chapter()` (without translation selection yet) are implemented; everything else in
-> the quickstart below is the intended public API and not built yet — see `CLAUDE.md` for
-> the planned roadmap.
+> **Status:** early development. `RanobeLib.get_info()`, `get_table_of_contents()`,
+> `get_chapter()`, and `get_volume()` (both without translation selection yet) are
+> implemented; everything else in the quickstart below is the intended public API and not
+> built yet — see `CLAUDE.md` for the planned roadmap.
 
 ## Installation
 

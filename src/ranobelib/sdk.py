@@ -6,6 +6,7 @@ from types import TracebackType
 from typing import Self
 
 from ranobelib.client import ApiClient
+from ranobelib.exceptions import VolumeNotFoundError
 from ranobelib.models import Chapter, Title, Volume
 from ranobelib.numbering import parse_slug_url
 
@@ -82,6 +83,31 @@ class RanobeLib:
         """
         data = await self._client.get_chapter(self._slug_url, number=number, volume=str(volume))
         return Chapter.model_validate(data)
+
+    async def get_volume(self, volume: int) -> Volume:
+        """Fetch a whole volume: all its chapters, each including content.
+
+        The API has no bulk "volume content" endpoint (see docs/api-notes.md), so this
+        fetches the chapter list once to find which numbers belong to the volume, then
+        fetches each of those chapters individually and sequentially.
+
+        Args:
+            volume: The volume number.
+
+        Raises:
+            VolumeNotFoundError: If the title has no chapters for this volume.
+        """
+        volume_str = str(volume)
+        raw_chapters = await self._client.get_chapters(self._slug_url)
+        numbers = [item["number"] for item in raw_chapters if item.get("volume") == volume_str]
+        if not numbers:
+            raise VolumeNotFoundError(self._slug_url, volume=volume_str)
+
+        chapters = []
+        for number in numbers:
+            data = await self._client.get_chapter(self._slug_url, number=number, volume=volume_str)
+            chapters.append(Chapter.model_validate(data))
+        return Volume(number=volume_str, chapters=chapters)
 
 
 def _group_into_volumes(chapters: list[Chapter]) -> list[Volume]:

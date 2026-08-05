@@ -6,6 +6,7 @@ from ranobelib.exceptions import (
     RanobeLibError,
     RateLimitError,
     TitleNotFoundError,
+    VolumeNotFoundError,
 )
 from ranobelib.models import Chapter, Title, Volume
 from ranobelib.sdk import RanobeLib
@@ -20,4 +21,5 @@ __all__ = [
     "Title",
     "TitleNotFoundError",
     "Volume",
+    "VolumeNotFoundError",
 ]
