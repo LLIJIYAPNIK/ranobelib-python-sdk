@@ -1,0 +1,48 @@
+site_name: ranobelib-python-sdk
+site_description: Async Python SDK for ranobelib.me
+site_url: https://LLIJIYAPNIK.github.io/ranobelib-python-sdk/
+repo_url: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk
+repo_name: LLIJIYAPNIK/ranobelib-python-sdk
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - API reference: reference.md
+  - API notes: api-notes.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_signature_annotations: true
+            separate_signature: true
+            merge_init_into_class: true
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - admonition
+  - tables
