@@ -3,7 +3,7 @@
 These exercise the real api.cdnlibs.org API against chapters known (from manual research,
 see docs/api-notes.md) to use each of the two content formats the API returns, at the
 client level (raw slug_url/number/volume strings). See test_get_chapter.py for the
-RanobeLib facade (int volume, translation selection still unimplemented).
+RanobeLib facade (int volume, translation selection via branch_id).
 """
 
 import pytest

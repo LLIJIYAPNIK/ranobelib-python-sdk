@@ -7,9 +7,10 @@ The SDK talks to the undocumented but open JSON API behind the site (`api.cdnlib
 part of the lib.social network) instead of scraping HTML.
 
 > **Status:** early development. `RanobeLib.get_info()`, `get_table_of_contents()`,
-> `get_chapter()`, `get_volume()`, `get_chapters()`, and `get_volumes()` (all without
-> translation selection yet) are implemented; everything else in the quickstart below is
-> the intended public API and not built yet — see `CLAUDE.md` for the planned roadmap.
+> `get_chapter()`, `get_volume()`, `get_chapters()`, `get_volumes()`, and
+> `get_translations()` (with `branch_id`-based translation selection) are implemented;
+> everything else in the quickstart below is the intended public API and not built yet —
+> see `CLAUDE.md` for the planned roadmap.
 
 ## Installation
 
@@ -41,7 +42,7 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
     volumes = await lib.get_volumes([1, 2, 3])
 
     translations = await lib.get_translations(volume=6, number="51.6")
-    chapter = await lib.get_chapter(volume=6, number="51.6", team_id=...)
+    chapter = await lib.get_chapter(volume=6, number="51.6", branch_id=...)
 
     await lib.export(chapters, fmt="epub", path="output.epub")
 ```
