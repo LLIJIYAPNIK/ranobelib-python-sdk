@@ -84,6 +84,20 @@ class RanobeLib:
         data = await self._client.get_chapter(self._slug_url, number=number, volume=str(volume))
         return Chapter.model_validate(data)
 
+    async def get_chapters(self, chapters: list[tuple[int, str]]) -> list[Chapter]:
+        """Fetch several chapters, including their content.
+
+        Each chapter is fetched with its own request to the single-chapter endpoint (see
+        ``get_chapter``), sequentially, in the order given.
+
+        Args:
+            chapters: A list of ``(volume, number)`` pairs identifying each chapter.
+
+        Raises:
+            ChapterNotFoundError: If any requested chapter doesn't exist.
+        """
+        return [await self.get_chapter(volume, number) for volume, number in chapters]
+
     async def get_volume(self, volume: int) -> Volume:
         """Fetch a whole volume: all its chapters, each including content.
 
