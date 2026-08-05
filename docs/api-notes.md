@@ -62,11 +62,10 @@ is not always 1:1:
   — the *translation* status (e.g. "Заброшен" / abandoned by the team), distinct from the
   title's own `status` field (e.g. "Онгоинг" / ongoing), which is present by default without
   requesting any extra fields.
-- `summary` is prosemirror-doc JSON (`{"type": "doc", "content": [...]}`), confirming the
-  suspicion from the original notes — chapter content (still unresearched, see below)
-  presumably uses the same document format. The SDK flattens it to plain text by
-  concatenating `text` leaves paragraph by paragraph; this is a minimal parser and will need
-  to be revisited (bold/italic/headings/lists) when chapter content is implemented.
+- `summary` is prosemirror-doc JSON (`{"type": "doc", "content": [...]}`). The SDK flattens
+  it to plain text by concatenating `text` leaves paragraph by paragraph — deliberately
+  simpler than the chapter-content renderer below, since a title summary doesn't need
+  bold/italic/images preserved the way chapter content does.
 - Fields present without being requested: `id`, `name`, `rus_name`, `eng_name`, `model`,
   `slug`, `slug_url`, `cover`, `ageRestriction`, `site`, `type`, `is_licensed`,
   `content_marking`, `status`, `releaseDateString`.
@@ -99,8 +98,70 @@ str` as-is from the API instead of a separate `number_secondary` parameter; see 
 differently, based on the wrong guess above, before `get_table_of_contents` was
 implemented).
 
+### Chapter content: endpoint, and two different content formats
+
+```
+GET /api/manga/{slug_url}/chapter?number={number}&volume={volume}&branch_id={branch_id}
+```
+
+`number`/`volume` match `CLAUDE.md`'s guessed pattern exactly (first try). `branch_id` is
+optional; confirmed working against a title with two translation teams (`11407--solo-leveling`,
+chapter `volume=1, number=0`, `branch_id=2251` vs `branch_id=635` returned that branch's own
+`teams`). **Without `branch_id`, the API did not pick `branches[0]` from the chapter-list
+response** — it returned the *older* of the two branches (created 2019 vs 2020). Default
+branch selection is not simply "first in the list"; needs its own investigation before
+implementing team selection / `MultipleTranslationsError` (roadmap step 9). 404 on an
+unknown `number`/`volume` combination returns the same generic body as title-not-found.
+
+The single-chapter response shape differs from a chapter's entry in the `/chapters` list:
+no `index`/`item_number`/`branches_count`/`branches` — instead a singular `branch_id` and a
+flat `teams` array (the teams for *that* branch specifically, can be empty even when the
+chapter has a team in the list endpoint's `branches[].teams`). Extra fields not modeled:
+`moderated`, `likes_count`, `is_liked`, `is_viewed`, `expired_type`, `expired_at`,
+`publish_at`, `translation_quality_rating`, `bundle`, `manga_id`, `created_at`.
+
+**Content is not always prosemirror-doc JSON**, despite CLAUDE.md's original suspicion
+(reasonable at the time, based on `ranobelib-loader`'s upload format and `Title.summary`
+being prosemirror). Sampled all 308 chapters of `6712--high-school-dxd-novel`'s `content`
+field (some requests hit 429 partway through — sample is 273 successfully fetched chapters,
+still large enough to be conclusive):
+
+- **235 chapters (~86%): `content` is an HTML string**, e.g.
+  `<p data-paragraph-index="1">text</p><p data-paragraph-index="2">text</p>`. Tags observed
+  across samples from two titles: `p`, `img`, `em`, `strong`, `b`, `i` (inconsistent between
+  `<em>/<strong>` and `<b>/<i>` for the same semantic meaning — presumably different editor
+  versions over the site's history; both pairs occur, never mixed within one chapter in the
+  samples checked). `data-paragraph-index` looks like a pure editor artifact, safe to ignore.
+  Image `<img>` tags carry an already-absolute `src`, e.g.
+  `<img loading="lazy" src="https://ranobelib.me/uploads/ranobe/{slug}/chapters/{chapter_id}/{filename}" />`.
+- **38 chapters (~14%): `content` is prosemirror-doc JSON** (`{"type": "doc", "content":
+  [...]}`), matching `Title.summary`'s format. Node types observed: `paragraph` (can have no
+  `content` key at all for a blank line; can carry `attrs: {"textAlign": "center"}` — not
+  currently reproduced in the SDK's HTML output, a known gap), `image` (block-level, sibling
+  to paragraphs, not nested inside one), `hardBreak`, `horizontalRule`. Mark types on `text`
+  nodes: `bold`, `italic`. No headings/lists/blockquotes observed in the sample.
+- The `content` format is a **per-chapter** property, not per-title or per-team — seen both
+  formats within the same title.
+
+**Image resolution for the prosemirror format**: an `image` node doesn't carry a URL
+directly, only an opaque id: `{"type": "image", "attrs": {"images": [{"image":
+"9bb930b8-...-f717bf"}]}}`. The response's top-level `attachments` array resolves it — find
+the entry whose `name` equals that id, then prepend `https://ranobelib.me` to its `url`
+(relative, e.g. `/uploads/ranobe/{slug}/chapters/{chapter_id}/{filename}.{extension}`) to
+get the same absolute URL shape the HTML-string format embeds directly. `attachments` is
+empty (`[]`) for chapters with no images, present alongside either content format.
+
+The SDK normalizes both formats into a single HTML fragment on `Chapter.content` (string
+format: passed through as-is; prosemirror format: rendered with the same tag vocabulary —
+`<p>`, `<img loading="lazy" src="...">`, `<strong>`, `<em>`, `<br />`, `<hr />` — so
+exporters only ever handle one shape), see `models.py`.
+
 ## Open questions
 
-See the "Что НЕ проверено" section of `CLAUDE.md` for the current list: chapter content
-endpoint/format, how a fractional `number` affects the reading URL, illustration CDN
-structure, paywall/403 behavior, and `/chapters` pagination for very large titles.
+See the "Что НЕ проверено" section of `CLAUDE.md` for the current list: how a fractional
+`number` affects the reading URL, illustration CDN structure for the `p`/`img`-only cases
+(confirmed to be `ranobelib.me` itself, not a separate CDN — see above, so this is largely
+resolved, but worth re-confirming CDN domain doesn't vary by title/region), paywall/403
+behavior, `/chapters` pagination for very large titles, default branch/team selection logic
+(see chapter-content section above), and reproducing `textAlign`/heading/list formatting
+from the prosemirror format if it turns out to matter for exports.
