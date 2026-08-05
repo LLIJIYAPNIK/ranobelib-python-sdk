@@ -1,0 +1,84 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate
+      connection:
+      - keep-alive
+      host:
+      - api.cdnlibs.org
+      site-id:
+      - '3'
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/manga/91443--new-hero-in-dxd?fields%5B%5D=background&fields%5B%5D=eng_name&fields%5B%5D=otherNames&fields%5B%5D=summary&fields%5B%5D=releaseDate&fields%5B%5D=genres&fields%5B%5D=tags&fields%5B%5D=teams&fields%5B%5D=authors&fields%5B%5D=artists&fields%5B%5D=chap_count
+  response:
+    body:
+      string: !!binary |
+        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
+    headers:
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Wed, 05 Aug 2026 19:32:20 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=q4CEMehPFpWC50A1; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
+        19:52:20 GMT
+      - __ddg10_=1785958340; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
+        19:52:20 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
+        19:52:20 GMT
+      - __ddg1_=unmI7PxVKlr1WfMQ6DWP; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Thu,
+        05-Aug-2027 19:32:20 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '99'
+    status:
+      code: 200
+      message: OK
+version: 1
