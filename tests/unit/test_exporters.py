@@ -1,0 +1,123 @@
+"""Unit tests for the exporter registry and the txt exporter."""
+
+from pathlib import Path
+
+import pytest
+
+from ranobelib.exporters import EXPORTERS, Exporter, register
+from ranobelib.exporters.txt import TxtExporter, html_to_text
+from ranobelib.models import Chapter, Cover, Label, Title
+
+
+def _title(**overrides: object) -> Title:
+    defaults: dict[str, object] = {
+        "id": 1,
+        "name": "Example Title",
+        "slug": "1--example-title",
+        "slug_url": "1--example-title",
+        "cover": Cover(),
+        "age_restriction": Label(id=0, label="16+"),
+        "status": Label(id=1, label="Ongoing"),
+    }
+    return Title.model_validate({**defaults, **overrides})
+
+
+def _chapter(*, volume: str, number: str, name: str | None, content: str | None) -> Chapter:
+    return Chapter.model_validate(
+        {"id": 1, "volume": volume, "number": number, "name": name, "content": content}
+    )
+
+
+def test_txt_exporter_is_registered_under_its_format() -> None:
+    assert EXPORTERS["txt"] is TxtExporter
+
+
+def test_txt_exporter_satisfies_exporter_protocol() -> None:
+    assert isinstance(TxtExporter(), Exporter)
+
+
+def test_register_adds_class_to_registry_and_returns_it_unchanged() -> None:
+    class _DummyExporter:
+        format = "dummy-test-format"
+
+        def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+            return output_path
+
+    try:
+        registered = register(_DummyExporter)
+        assert registered is _DummyExporter
+        assert EXPORTERS["dummy-test-format"] is _DummyExporter
+    finally:
+        del EXPORTERS["dummy-test-format"]
+
+
+def test_html_to_text_joins_paragraphs_with_blank_line() -> None:
+    html = "<p>First paragraph.</p><p>Second paragraph.</p>"
+
+    assert html_to_text(html) == "First paragraph.\n\nSecond paragraph."
+
+
+def test_html_to_text_converts_br_to_newline_within_paragraph() -> None:
+    html = "<p>Line one.<br />Line two.</p>"
+
+    assert html_to_text(html) == "Line one.\nLine two."
+
+
+def test_html_to_text_converts_hr_to_separator() -> None:
+    html = "<p>Before.</p><hr /><p>After.</p>"
+
+    assert html_to_text(html) == "Before.\n\n---\n\nAfter."
+
+
+def test_html_to_text_drops_images_but_keeps_marked_up_text() -> None:
+    html = '<p><strong>Bold</strong> and <em>italic</em>.</p><img loading="lazy" src="x.jpg" />'
+
+    assert html_to_text(html) == "Bold and italic."
+
+
+def test_html_to_text_decodes_entities() -> None:
+    assert html_to_text("<p>Tom &amp; Jerry</p>") == "Tom & Jerry"
+
+
+def test_html_to_text_handles_empty_content() -> None:
+    assert html_to_text("") == ""
+
+
+def test_txt_exporter_writes_title_and_chapter_headings(tmp_path: Path) -> None:
+    title = _title(name="My Novel")
+    chapters = [
+        _chapter(volume="1", number="1", name="Beginnings", content="<p>Once upon a time.</p>"),
+        _chapter(volume="1", number="2", name=None, content="<p>Continued.</p>"),
+    ]
+    output_path = tmp_path / "out.txt"
+
+    result = TxtExporter().export(title, chapters, output_path)
+
+    assert result == output_path
+    text = output_path.read_text(encoding="utf-8")
+    assert text.startswith("My Novel\n\n\n")
+    assert "Volume 1, Chapter 1: Beginnings" in text
+    assert "Once upon a time." in text
+    assert "Volume 1, Chapter 2" in text
+    assert "Volume 1, Chapter 2:" not in text  # No name -> no trailing colon.
+    assert "Continued." in text
+
+
+def test_txt_exporter_handles_chapter_without_content(tmp_path: Path) -> None:
+    title = _title()
+    chapters = [_chapter(volume="1", number="1", name=None, content=None)]
+    output_path = tmp_path / "out.txt"
+
+    TxtExporter().export(title, chapters, output_path)
+
+    assert output_path.read_text(encoding="utf-8").strip().endswith("Volume 1, Chapter 1")
+
+
+@pytest.mark.parametrize("chapters", [[]])
+def test_txt_exporter_handles_no_chapters(tmp_path: Path, chapters: list[Chapter]) -> None:
+    title = _title(name="Empty Book")
+    output_path = tmp_path / "out.txt"
+
+    TxtExporter().export(title, chapters, output_path)
+
+    assert output_path.read_text(encoding="utf-8").strip() == "Empty Book"
