@@ -9,12 +9,12 @@ part of the lib.social network) instead of scraping HTML.
 > **Status:** early development. `RanobeLib.get_info()`, `get_table_of_contents()`,
 > `get_chapter()`, `get_volume()`, `get_chapters()`, `get_volumes()`,
 > `get_translations()` (with `branch_id`-based translation selection), and
-> `export(chapters, fmt=..., path=...)` (`"txt"` and `"fb2"`) are implemented, with raw API
-> responses cached to disk (`cache_dir`/`cache_ttl` on the constructor, `refresh=True` on
-> individual fetches) and the underlying client bounding concurrency, pacing requests, and
-> retrying 429/5xx with backoff; everything else in the quickstart below (`epub`/`pdf`
-> export) is the intended public API and not built yet — see `CLAUDE.md` for the planned
-> roadmap.
+> `export(chapters, fmt=..., path=...)` (`"txt"`, `"fb2"`, and `"epub"` with embedded cover
+> and illustrations) are implemented, with raw API responses cached to disk
+> (`cache_dir`/`cache_ttl` on the constructor, `refresh=True` on individual fetches) and the
+> underlying client bounding concurrency, pacing requests, and retrying 429/5xx with
+> backoff; everything else in the quickstart below (`pdf` export) is the intended public API
+> and not built yet — see `CLAUDE.md` for the planned roadmap.
 
 ## Installation
 
