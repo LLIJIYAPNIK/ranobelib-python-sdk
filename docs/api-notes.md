@@ -9,8 +9,8 @@ list of open questions.
 
 - Base URL: `https://api.cdnlibs.org/api`, no authorization required for public content.
 - `GET /api/manga/{slug}/chapters` returns the full chapter list (including fractional
-  `number_secondary` chapters) in a single response, keyed under `"data"`. No pagination
-  observed so far on a 308-chapter title.
+  chapters) in a single response, keyed under `"data"`. No pagination observed so far on a
+  308-chapter title.
 - `GET /api/manga/{slug}?fields[]=...` returns title metadata; the full set of useful
   `fields[]` values has not been catalogued yet.
 
@@ -79,8 +79,28 @@ optional — `/book/91443--new-hero-in-dxd` also resolves) has the API's `slug_u
 directly as the path parameter for `/api/manga/{slug_url}` — no separate slug/id lookup step
 needed.
 
+### `number_secondary` is not a chapter-number fraction — it mirrors `volume`
+
+CLAUDE.md's original notes guessed `number_secondary` was the fractional part of a chapter
+number (e.g. `number_secondary: "5"` on a `number: "51"` chapter, read as chapter `"51.5"`).
+Verified against three different titles totaling 667 chapters (`6712--high-school-dxd-novel`,
+308 chapters, 25 volumes; `147836--o-moem-pererozdenii-v-bessmertnogo`, 84 chapters, 8
+volumes, including fractional chapter numbers `"6.5"`/`"81.5"`; `11407--solo-leveling`, 275
+chapters including 20 multi-team-branch chapters): **`number_secondary` equals `volume` in
+every single case, zero exceptions.** The exact example the original guess was based on
+(`volume: "5", number: "51", number_secondary: "5"`) fits this pattern too — it wasn't a
+coincidental fraction, `number_secondary` was just echoing the volume.
+
+The actual fractional part of a chapter number, when present, is already embedded directly
+in the `number` field as a string (`"6.5"`, `"81.5"`, `"0.1"`) — there is no separate field
+for it. This means the SDK's `get_chapter`/`get_chapters`/`get_translations` take `number:
+str` as-is from the API instead of a separate `number_secondary` parameter; see CLAUDE.md's
+"Публичный API" section for the corrected signatures (this was originally documented
+differently, based on the wrong guess above, before `get_table_of_contents` was
+implemented).
+
 ## Open questions
 
 See the "Что НЕ проверено" section of `CLAUDE.md` for the current list: chapter content
-endpoint/format, `number_secondary` default for non-fractional chapters, illustration CDN
+endpoint/format, how a fractional `number` affects the reading URL, illustration CDN
 structure, paywall/403 behavior, and `/chapters` pagination for very large titles.

@@ -46,21 +46,21 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
     info = await lib.get_info()                       # метаданные тайтла
     toc = await lib.get_table_of_contents()            # тома/главы/названия, без контента
 
-    chapter = await lib.get_chapter(volume=6, number=51, number_secondary="6")
+    chapter = await lib.get_chapter(volume=6, number="51.6")
     volume = await lib.get_volume(volume=6)
 
-    chapters = await lib.get_chapters([(6, "51", "6"), (6, "52", None)])
+    chapters = await lib.get_chapters([(6, "51.6"), (6, "52")])
     volumes = await lib.get_volumes([1, 2, 3])
 
-    translations = await lib.get_translations(volume=6, number=51, number_secondary="6")
-    chapter = await lib.get_chapter(volume=6, number=51, number_secondary="6", team_id=...)
+    translations = await lib.get_translations(volume=6, number="51.6")
+    chapter = await lib.get_chapter(volume=6, number="51.6", team_id=...)
 
     await lib.export(chapters, fmt="epub", path="output.epub")
 ```
 
 Требования из ТЗ и как они ложатся на методы:
 
-1. Скачивание отдельной главы (том + номер главы, с учётом `number_secondary`) → `get_chapter`
+1. Скачивание отдельной главы (том + номер главы, включая дробные вида `"51.6"`) → `get_chapter`
 2. Скачивание тома → `get_volume`
 3. Скачивание нескольких глав → `get_chapters`
 4. Скачивание нескольких томов → `get_volumes`
@@ -73,8 +73,12 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
    (первая команда по `branches`) — решить и задокументировать в первом PR, где это
    появится, не молчать об этом выборе.
 
-Номера глав с дробной частью (`number_secondary`) передаются как отдельный опциональный
-параметр, а не склеенная строка вида `"51.6"` — меньше просится на ошибки парсинга.
+`number` уже приходит от API строкой, при необходимости содержащей дробную часть
+(`"51.6"`) — отдельного параметра для дробной части в SDK нет, `number: str` передаётся
+как есть. Изначально предполагался отдельный параметр `number_secondary` для дробной
+части (чтобы не склеивать строку самим), но ручная проверка (см. ниже) показала, что
+поле `number_secondary` в API — не дробная часть, а дублирует `volume`; контракт
+поправлен, когда это обнаружилось при реализации `get_table_of_contents`.
 
 ## Что уже известно про API (проверено вручную)
 
@@ -122,10 +126,13 @@ GET /api/manga/{slug}/chapters
 }
 ```
 
-`number_secondary` — строка, может быть многозначной (встречалось `"10"`), это и есть
-дробная часть номера главы (`c86.10`). Весь список, включая дробные главы, отдаётся одним
-запросом — никакого перебора `.1`, `.2` и т.д. быть не должно, это заменяет то, что
-обсуждалось в начале.
+`number_secondary` — строка; **проверено на 667 главах трёх разных тайтлов (0
+расхождений): значение всегда равно `volume`**, это не дробная часть номера главы, как
+предполагалось изначально по одному примеру. Дробная часть номера главы (`"6.5"`,
+`"81.5"`, `"0.1"`) приходит непосредственно внутри строки `number` — отдельного поля для
+неё нет. Подробности и данные проверки — в `docs/api-notes.md`. Весь список, включая
+дробные главы, отдаётся одним запросом — никакого перебора `.1`, `.2` и т.д. быть не
+должно, это заменяет то, что обсуждалось в начале.
 
 `branches` — переводы разных команд одной главы; при `branches_count > 1` есть выбор
 перевода (пункт 7 из ТЗ), выбирается по `id`/`teams`.
@@ -148,9 +155,8 @@ GET /api/manga/{slug}?fields[]=background&fields[]=eng_name&fields[]=otherNames&
   HTML или prosemirror-doc JSON) — перед PR на скачивание контента главы нужно открыть
   реальную страницу главы в браузере, посмотреть Network-запросы и зафиксировать реальную
   структуру ответа в этом файле или в `docs/api-notes.md`.
-- Что означает `number_secondary` для "обычных" глав без дробной части — `"0"` или `"1"`
-  по умолчанию, и как это влияет на URL чтения (`/read/v{volume}/c{number}` без точки vs
-  всегда с точкой). Проверить на паре примеров перед тем, как писать логику построения URL.
+- Как дробный `number` (`"6.5"`) влияет на URL чтения (`/read/v{volume}/c{number}` без
+  точки vs всегда с точкой) — не проверено, `number_secondary` тут ни при чём (см. выше).
 - Домен и структура CDN для картинок (встречался `cover.cdnlibs.org`, но для иллюстраций
   внутри глав нужно свериться отдельно).
 - Поведение при 403/404/пейволле (платные/ранние главы, 18+ без токена) — коды ответа,
@@ -174,7 +180,7 @@ ranobelib-python-sdk/
 │       ├── models.py             # pydantic-модели (Title, Chapter, Volume, Team, Branch, ...)
 │       ├── exceptions.py
 │       ├── cache.py              # дисковый кэш сырых ответов API
-│       ├── numbering.py          # логика номеров глав / number_secondary / парсинг URL тайтла
+│       ├── numbering.py          # сортировка/сравнение номеров глав, парсинг URL тайтла
 │       └── exporters/
 │           ├── __init__.py       # Protocol Exporter + реестр форматов
 │           ├── txt.py
@@ -288,7 +294,7 @@ CI не нужен.
 - `pytest-recording` + `vcrpy` для тестов, которые бьют по `RanobeLib`/клиенту: кассеты в
   `tests/cassettes/<test_name>.yaml`, `record_mode="once"` (перезаписываются только вручную,
   через `--record-mode=rewrite`, если API поменялось).
-- Модульные тесты без сети — для `numbering.py` (разбор `number`/`number_secondary`,
+- Модульные тесты без сети — для `numbering.py` (сортировка/сравнение дробных `number`,
   парсинг URL тайтла из разных форматов ссылок), моделей (валидация pydantic на кривом
   JSON), исключений (маппинг статус-кодов → нужный exception), экспортёров (генерируемый
   epub/fb2 — проверять структуру через `ebooklib`/`lxml`, а не только "файл создался").
@@ -307,8 +313,8 @@ CI не нужен.
    `LICENSE` (MIT), заготовка README. Без функционала, без CI.
 2. **HTTP-клиент + метаданные тайтла** (`get_info`) + базовые исключения + модели `Title`.
    Первый функциональный PR → добавляется `ci.yml`.
-3. **Список глав и нумерация** (`get_table_of_contents`, `numbering.py`, обработка
-   `number_secondary`, разбор URL тайтла).
+3. **Список глав и нумерация** (`get_table_of_contents`, `numbering.py`: сортировка
+   дробных номеров глав, разбор URL тайтла).
 4. **Исследование + реализация контента главы** (сначала ручное исследование эндпоинта,
    фиксация в `docs/api-notes.md`, потом код + модель `Chapter.content`).
 5. **`get_chapter`** — скачивание одной главы.

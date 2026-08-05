@@ -6,9 +6,9 @@ chapters and volumes, and export to epub, fb2, txt, or pdf.
 The SDK talks to the undocumented but open JSON API behind the site (`api.cdnlibs.org`,
 part of the lib.social network) instead of scraping HTML.
 
-> **Status:** early development. `RanobeLib.get_info()` is implemented; everything else in
-> the quickstart below is the intended public API and not built yet — see `CLAUDE.md` for
-> the planned roadmap.
+> **Status:** early development. `RanobeLib.get_info()` and `get_table_of_contents()` are
+> implemented; everything else in the quickstart below is the intended public API and not
+> built yet — see `CLAUDE.md` for the planned roadmap.
 
 ## Installation
 
@@ -33,14 +33,14 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
     info = await lib.get_info()
     toc = await lib.get_table_of_contents()
 
-    chapter = await lib.get_chapter(volume=6, number=51, number_secondary="6")
+    chapter = await lib.get_chapter(volume=6, number="51.6")
     volume = await lib.get_volume(volume=6)
 
-    chapters = await lib.get_chapters([(6, "51", "6"), (6, "52", None)])
+    chapters = await lib.get_chapters([(6, "51.6"), (6, "52")])
     volumes = await lib.get_volumes([1, 2, 3])
 
-    translations = await lib.get_translations(volume=6, number=51, number_secondary="6")
-    chapter = await lib.get_chapter(volume=6, number=51, number_secondary="6", team_id=...)
+    translations = await lib.get_translations(volume=6, number="51.6")
+    chapter = await lib.get_chapter(volume=6, number="51.6", team_id=...)
 
     await lib.export(chapters, fmt="epub", path="output.epub")
 ```
