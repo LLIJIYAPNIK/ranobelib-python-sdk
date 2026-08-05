@@ -13,6 +13,7 @@ from ranobelib.exceptions import (
     MultipleTranslationsError,
     VolumeNotFoundError,
 )
+from ranobelib.exporters import EXPORTERS
 from ranobelib.models import Chapter, ChapterBranch, Title, Volume
 from ranobelib.numbering import parse_slug_url
 
@@ -213,6 +214,25 @@ class RanobeLib:
         """
         raw_chapters = await self._get_chapters()
         return [await self._build_volume(volume, raw_chapters) for volume in volumes]
+
+    async def export(self, chapters: list[Chapter], *, fmt: str, path: str | Path) -> Path:
+        """Export chapters to a file.
+
+        Args:
+            chapters: The chapters to include, in the order they should appear.
+            path: Where to write the exported file.
+            fmt: Export format — a key of ``ranobelib.exporters.EXPORTERS``
+                (currently: ``"txt"``).
+
+        Raises:
+            ValueError: If ``fmt`` isn't a registered export format.
+        """
+        exporter_cls = EXPORTERS.get(fmt)
+        if exporter_cls is None:
+            available = ", ".join(sorted(EXPORTERS)) or "(none registered)"
+            raise ValueError(f"Unknown export format {fmt!r}. Available: {available}")
+        title = await self.get_info()
+        return exporter_cls().export(title, chapters, Path(path))
 
     async def _build_volume(self, volume: int, raw_chapters: list[dict[str, Any]]) -> Volume:
         volume_str = str(volume)

@@ -7,13 +7,13 @@ The SDK talks to the undocumented but open JSON API behind the site (`api.cdnlib
 part of the lib.social network) instead of scraping HTML.
 
 > **Status:** early development. `RanobeLib.get_info()`, `get_table_of_contents()`,
-> `get_chapter()`, `get_volume()`, `get_chapters()`, `get_volumes()`, and
-> `get_translations()` (with `branch_id`-based translation selection) are implemented, with
-> raw API responses cached to disk (`cache_dir`/`cache_ttl` on the constructor,
-> `refresh=True` on individual fetches) and the underlying client bounding concurrency,
-> pacing requests, and retrying 429/5xx with backoff; everything else in the quickstart
-> below is the intended public API and not built yet — see `CLAUDE.md` for the planned
-> roadmap.
+> `get_chapter()`, `get_volume()`, `get_chapters()`, `get_volumes()`,
+> `get_translations()` (with `branch_id`-based translation selection), and
+> `export(chapters, fmt="txt", path=...)` are implemented, with raw API responses cached to
+> disk (`cache_dir`/`cache_ttl` on the constructor, `refresh=True` on individual fetches)
+> and the underlying client bounding concurrency, pacing requests, and retrying 429/5xx with
+> backoff; everything else in the quickstart below (`fb2`/`epub`/`pdf` export) is the
+> intended public API and not built yet — see `CLAUDE.md` for the planned roadmap.
 
 ## Installation
 
