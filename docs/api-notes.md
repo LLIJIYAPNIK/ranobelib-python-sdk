@@ -270,6 +270,41 @@ per-instance, а без этого тесты вроде `get_volume()` на р�
 реально ждали бы ~10 секунд ради поведения, которое `test_client.py` и так проверяет точно
 и без ожидания через инъекцию fake `sleep`/`clock`.
 
+### PDF export: WeasyPrint needs native libraries at *import* time, not just install time
+
+Discovered while implementing the pdf exporter (roadmap step 15), on this repo's Windows
+dev environment: `uv add weasyprint` installs cleanly (pure wheel, no build step) on any
+platform, but `import weasyprint` itself raises `OSError: cannot load library
+'libgobject-2.0-0'` unless the GTK3 runtime (Pango/cairo/gobject, which WeasyPrint uses for
+text shaping) is present on the system. This is different from every other dependency this
+project has added — `pip install` succeeding doesn't mean the package actually works.
+
+**Consequence for `import ranobelib`:** `exporters/__init__.py` eagerly auto-imports every
+module in the package (see "Экспорт" in CLAUDE.md) to run each exporter's `@register`. If
+`pdf.py` did a plain top-level `import weasyprint`, that OSError would propagate straight
+through the auto-import loop and crash `import ranobelib` itself on any system without
+GTK3 — not just "pdf export doesn't work", the whole SDK would be unusable.
+
+**Fix**: `pdf.py` wraps its own `import weasyprint` in `try/except (ImportError, OSError)`;
+on failure it sets `weasyprint = None` and skips defining `PdfExporter` entirely (the
+`@register` line lives inside `if weasyprint is not None:`). `import ranobelib` then always
+succeeds, `EXPORTERS` just doesn't have a `"pdf"` key, and `RanobeLib.export(fmt="pdf")` on
+such a system raises the same `ValueError: Unknown export format 'pdf'. Available: ...` it
+would for any other unregistered format — no new exception type needed, and the message
+already tells the caller what *is* available.
+
+**Testing implication**: `tests/unit/test_pdf_exporter.py`'s WeasyPrint-dependent tests
+(`pytest.mark.skipif(weasyprint is None, ...)`) skip rather than fail on machines without
+the native deps — this repo's Windows dev environment among them. `ci.yml`'s `test` job
+installs `libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libcairo2` via `apt-get`
+before running pytest so they actually execute there instead of silently always skipping.
+No VCR-backed integration test for `fmt="pdf"` exists (unlike txt/fb2/epub) for the same
+root cause: recording its cassette needs a real WeasyPrint run to make the real HTTP calls
+worth capturing, which isn't possible in this dev environment, and CI runs with
+`--record-mode=none` so it can't record one either — see tests/integration/test_export.py's
+module docstring. The unit tests (mock transport, no cassette needed) cover the same
+download-then-render pipeline instead.
+
 ## Open questions
 
 See the "Что НЕ проверено" section of `CLAUDE.md` for the current list: how a fractional
