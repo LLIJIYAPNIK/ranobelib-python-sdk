@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
 
+from ranobelib.cache import DEFAULT_CACHE_DIR, DiskCache
 from ranobelib.client import ApiClient
 from ranobelib.exceptions import (
     ChapterNotFoundError,
@@ -39,14 +41,30 @@ class RanobeLib:
         ```
     """
 
-    def __init__(self, url: str) -> None:
+    def __init__(
+        self,
+        url: str,
+        *,
+        cache_dir: str | Path | None = None,
+        cache_ttl: float | None = None,
+    ) -> None:
         """Initialize the SDK for a title.
 
         Args:
             url: A ranobelib.me title URL, or a bare ``{id}--{slug}`` identifier.
+            cache_dir: Where to cache raw API responses (title metadata, chapter list,
+                chapter content) on disk, so a repeated export or downloading newly added
+                chapters doesn't re-fetch data already on hand. Defaults to
+                ``.ranobelib_cache`` in the current working directory.
+            cache_ttl: Seconds after which a cached response is treated as stale and
+                re-fetched. ``None`` (the default) means cached responses never expire on
+                their own — see ``refresh=True`` on individual methods to force one anyway.
         """
         self._slug_url = parse_slug_url(url)
         self._client = ApiClient()
+        self._cache = DiskCache(
+            cache_dir if cache_dir is not None else DEFAULT_CACHE_DIR, ttl=cache_ttl
+        )
 
     async def __aenter__(self) -> Self:
         return self
@@ -63,19 +81,35 @@ class RanobeLib:
         """Close the underlying HTTP client."""
         await self._client.aclose()
 
-    async def get_info(self) -> Title:
-        """Fetch title metadata: names, cover, summary, genres, tags, authors, teams."""
-        data = await self._client.get_title(self._slug_url, fields=_INFO_FIELDS)
+    async def get_info(self, *, refresh: bool = False) -> Title:
+        """Fetch title metadata: names, cover, summary, genres, tags, authors, teams.
+
+        Args:
+            refresh: Bypass the disk cache and re-fetch from the API even if a cached
+                response is on hand.
+        """
+        data = await self._get_title(refresh=refresh)
         return Title.model_validate(data)
 
-    async def get_table_of_contents(self) -> list[Volume]:
-        """Fetch the title's volumes and chapter names/numbers, without chapter content."""
-        raw_chapters = await self._client.get_chapters(self._slug_url)
+    async def get_table_of_contents(self, *, refresh: bool = False) -> list[Volume]:
+        """Fetch the title's volumes and chapter names/numbers, without chapter content.
+
+        Args:
+            refresh: Bypass the disk cache and re-fetch from the API even if a cached
+                response is on hand — needed to pick up newly published chapters, since
+                otherwise the cached chapter list would keep being reused.
+        """
+        raw_chapters = await self._get_chapters(refresh=refresh)
         chapters = [Chapter.model_validate(item) for item in raw_chapters]
         return _group_into_volumes(chapters)
 
     async def get_chapter(
-        self, volume: int, number: str, *, branch_id: int | None = None
+        self,
+        volume: int,
+        number: str,
+        *,
+        branch_id: int | None = None,
+        refresh: bool = False,
     ) -> Chapter:
         """Fetch a single chapter, including its content.
 
@@ -91,6 +125,8 @@ class RanobeLib:
                 (e.g. ``"51.6"``).
             branch_id: Which translation to fetch, as returned by ``get_translations()``.
                 Only required when the chapter has more than one.
+            refresh: Bypass the disk cache and re-fetch from the API even if a cached
+                response is on hand.
 
         Raises:
             MultipleTranslationsError: If the chapter has more than one translation and
@@ -98,9 +134,9 @@ class RanobeLib:
         """
         volume_str = str(volume)
         if branch_id is None:
-            raw_chapters = await self._client.get_chapters(self._slug_url)
+            raw_chapters = await self._get_chapters(refresh=refresh)
             branch_id = self._resolve_branch_id(volume_str, number, raw_chapters)
-        return await self._fetch_chapter(volume_str, number, branch_id)
+        return await self._fetch_chapter(volume_str, number, branch_id, refresh=refresh)
 
     async def get_chapters(self, chapters: list[tuple[int, str]]) -> list[Chapter]:
         """Fetch several chapters, including their content.
@@ -117,7 +153,7 @@ class RanobeLib:
             MultipleTranslationsError: If any requested chapter has more than one
                 translation.
         """
-        raw_chapters = await self._client.get_chapters(self._slug_url)
+        raw_chapters = await self._get_chapters()
         result = []
         for volume, number in chapters:
             volume_str = str(volume)
@@ -136,7 +172,7 @@ class RanobeLib:
             ChapterNotFoundError: If no chapter exists for this volume/number.
         """
         volume_str = str(volume)
-        raw_chapters = await self._client.get_chapters(self._slug_url)
+        raw_chapters = await self._get_chapters()
         item = _find_raw_chapter(raw_chapters, volume_str, number)
         if item is None:
             raise ChapterNotFoundError(self._slug_url, volume=volume_str, number=number)
@@ -157,7 +193,7 @@ class RanobeLib:
             MultipleTranslationsError: If any of the volume's chapters has more than one
                 translation.
         """
-        raw_chapters = await self._client.get_chapters(self._slug_url)
+        raw_chapters = await self._get_chapters()
         return await self._build_volume(volume, raw_chapters)
 
     async def get_volumes(self, volumes: list[int]) -> list[Volume]:
@@ -175,7 +211,7 @@ class RanobeLib:
             MultipleTranslationsError: If any of the volumes' chapters has more than one
                 translation.
         """
-        raw_chapters = await self._client.get_chapters(self._slug_url)
+        raw_chapters = await self._get_chapters()
         return [await self._build_volume(volume, raw_chapters) for volume in volumes]
 
     async def _build_volume(self, volume: int, raw_chapters: list[dict[str, Any]]) -> Volume:
@@ -190,10 +226,38 @@ class RanobeLib:
             chapters.append(await self._fetch_chapter(volume_str, number, branch_id))
         return Volume(number=volume_str, chapters=chapters)
 
-    async def _fetch_chapter(self, volume_str: str, number: str, branch_id: int | None) -> Chapter:
+    async def _get_title(self, *, refresh: bool = False) -> dict[str, Any]:
+        key = f"title:{self._slug_url}:{','.join(sorted(_INFO_FIELDS))}"
+        if not refresh:
+            cached = self._cache.get(key)
+            if cached is not None:
+                return cached  # type: ignore[no-any-return]
+        data = await self._client.get_title(self._slug_url, fields=_INFO_FIELDS)
+        self._cache.set(key, data)
+        return data
+
+    async def _get_chapters(self, *, refresh: bool = False) -> list[dict[str, Any]]:
+        key = f"chapters:{self._slug_url}"
+        if not refresh:
+            cached = self._cache.get(key)
+            if cached is not None:
+                return cached  # type: ignore[no-any-return]
+        data = await self._client.get_chapters(self._slug_url)
+        self._cache.set(key, data)
+        return data
+
+    async def _fetch_chapter(
+        self, volume_str: str, number: str, branch_id: int | None, *, refresh: bool = False
+    ) -> Chapter:
+        key = f"chapter:{self._slug_url}:{volume_str}:{number}:{branch_id}"
+        if not refresh:
+            cached = self._cache.get(key)
+            if cached is not None:
+                return Chapter.model_validate(cached)
         data = await self._client.get_chapter(
             self._slug_url, number=number, volume=volume_str, branch_id=branch_id
         )
+        self._cache.set(key, data)
         return Chapter.model_validate(data)
 
     def _resolve_branch_id(
