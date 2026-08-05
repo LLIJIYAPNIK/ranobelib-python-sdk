@@ -1,5 +1,11 @@
 # ranobelib-python-sdk
 
+[![License: MIT](https://img.shields.io/github/license/LLIJIYAPNIK/ranobelib-python-sdk)](LICENSE)
+[![Python versions](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](pyproject.toml)
+[![CI](https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/actions/workflows/ci.yml)
+[![Coverage Status](https://coveralls.io/repos/github/LLIJIYAPNIK/ranobelib-python-sdk/badge.svg?branch=main)](https://coveralls.io/github/LLIJIYAPNIK/ranobelib-python-sdk?branch=main)
+[![Docs](https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/actions/workflows/docs.yml/badge.svg)](https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/actions/workflows/docs.yml)
+
 Async Python SDK for [ranobelib.me](https://ranobelib.me): fetch title metadata, download
 chapters and volumes, and export to epub, fb2, txt, or pdf.
 

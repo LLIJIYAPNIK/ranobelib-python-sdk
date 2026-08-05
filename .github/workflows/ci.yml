@@ -45,6 +45,14 @@ jobs:
         with:
           enable-cache: true
       - run: uv run --python ${{ matrix.python-version }} pytest --cov=ranobelib --cov-report=xml --cov-fail-under=95 --record-mode=none
+      # One upload, not three: the matrix runs the same suite on 3.11/3.12/3.13, and
+      # Coveralls treats each upload as its own build, so uploading from every leg would
+      # just create noise (and cost separate build slots) for identical coverage data.
+      - name: Upload coverage to Coveralls
+        if: matrix.python-version == '3.12'
+        run: uv run coveralls
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
 
   build:
     runs-on: ubuntu-latest

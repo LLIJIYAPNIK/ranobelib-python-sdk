@@ -403,7 +403,15 @@ CI не нужен.
 
 - job `lint`: `uv run ruff check .`, `uv run ruff format --check .`
 - job `typecheck`: `uv run mypy src`
-- job `test`: матрица по Python 3.11 / 3.12 / 3.13, `uv run pytest --cov=ranobelib --cov-report=xml --cov-fail-under=95`
+- job `test`: матрица по Python 3.11 / 3.12 / 3.13, `uv run pytest --cov=ranobelib --cov-report=xml --cov-fail-under=95`.
+  Загрузка покрытия в Coveralls — только с одной ноги матрицы (`3.12`, `if:` в шаге), не со
+  всех трёх: покрытие одно и то же на всех версиях Python, а Coveralls считает каждую
+  загрузку отдельным build — три загрузки одних и тех же данных только шум. Инструмент —
+  пакет `coveralls` (PyPI, dev-зависимость), не `coverallsapp/github-action`: читает
+  `.coverage` (родной формат coverage.py) напрямую через API coverage.py, а не через
+  промежуточный файл конкретного формата (lcov и т.п.), и сам определяет GitHub Actions
+  через `GITHUB_ACTIONS`/`COVERALLS_REPO_TOKEN` без доп. настройки — токен уже создан на
+  coveralls.io и лежит в секретах репозитория под тем же именем.
 - job `build`: `uv build`, проверка, что пакет собирается
 - job `docs`: `uv run --group docs mkdocs build --strict` — не деплоит, только проверяет, что
   сайт вообще собирается (`--strict` роняет билд на битых mkdocstrings-ссылках вроде `:::
@@ -460,5 +468,11 @@ push в `main`. Тема — `mkdocs-material`, `mkdocstrings[python]` в отд
 14. **`epub`-экспортёр** (+ обложка и иллюстрации).
 15. **`pdf`-экспортёр** (WeasyPrint, переиспользование HTML-шаблона).
 16. **Документация** — `mkdocs`, `docs.yml`, дописать README до полноценного quickstart.
+17. **Бейджи в README** — license, версии Python, CI (агрегированный статус `ci.yml`:
+    lint/typecheck/test/build), coverage (Coveralls, токен уже подключён на
+    coveralls.io), docs (статус `docs.yml`). Требует загрузки покрытия в Coveralls из
+    `ci.yml` (сейчас `--cov-report=xml` только пишет файл локально в раннере, никуда не
+    отправляется) — задокументировать выбор инструмента для загрузки здесь же, когда
+    реализовано.
 
 Каждый пункт — отдельная ветка/PR по правилам из раздела Git workflow.

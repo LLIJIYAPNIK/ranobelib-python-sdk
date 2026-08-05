@@ -41,6 +41,7 @@ module-name = "ranobelib"
 
 [dependency-groups]
 dev = [
+    "coveralls>=4.0",
     "lxml>=5.0",
     "mypy>=1.10",
     "pypdf>=6.14.2",
