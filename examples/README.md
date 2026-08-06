@@ -1,0 +1,31 @@
+# Examples
+
+Every script in this directory is a complete, self-contained program — save/copy it as-is
+and run `python examples/<file>.py`. Each one was actually executed against the live
+ranobelib.me site to produce the "Expected output" comment at the bottom of the file; only
+chapter HTML content is truncated (`[:200]`/`[:300]`) for readability, everything else is
+the real output verbatim. Titles/URLs may change or get removed on the site over time, so an
+old "Expected output" block can drift from what you see when you re-run a script — that's
+the site changing, not a bug in the SDK.
+
+Scripts are heavily commented on purpose: each one is meant to be read top to bottom as a
+mini-tutorial for the feature it demonstrates, not just copy-pasted.
+
+| File | Feature |
+|---|---|
+| [`01_title_metadata.py`](01_title_metadata.py) | `get_info()` — title metadata |
+| [`02_table_of_contents.py`](02_table_of_contents.py) | `get_table_of_contents()` — volumes/chapters without content |
+| [`03_single_chapter.py`](03_single_chapter.py) | `get_chapter()` — one chapter's content |
+| [`04_multiple_chapters.py`](04_multiple_chapters.py) | `get_chapters()` — several chapters at once |
+| [`05_single_volume.py`](05_single_volume.py) | `get_volume()` — a whole volume |
+| [`06_multiple_volumes.py`](06_multiple_volumes.py) | `get_volumes()` — several volumes at once |
+| [`07_translation_selection.py`](07_translation_selection.py) | `get_translations()` + `branch_id` — picking a translation |
+| [`08_download_title.py`](08_download_title.py) | `download_title()` — whole-title bulk download |
+| [`09_disk_caching.py`](09_disk_caching.py) | disk cache + `refresh=True` |
+| [`10_export_formats.py`](10_export_formats.py) | `export()` to txt/fb2/epub/pdf |
+| [`11_error_handling.py`](11_error_handling.py) | `TitleNotFoundError` / `ChapterNotFoundError` |
+
+See the [full API reference](https://LLIJIYAPNIK.github.io/ranobelib-python-sdk/reference/)
+for every public class/method, including `AuthRequiredError` and `RateLimitError`, which
+aren't demonstrated here since they need conditions (paid content, sustained rate limiting)
+that aren't reliably reproducible in a short script.
