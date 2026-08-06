@@ -12,11 +12,20 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  # true, not GitHub's own starter-template default of false: a burst of pushes to main
+  # (e.g. merging several PRs back to back) used to queue one docs deploy run per push:
+  # deploy-pages polls GitHub's Pages backend for up to 10 minutes before giving up, and
+  # with cancel-in-progress: false none of the stale, still-queued runs behind an earlier
+  # one got cancelled — they just piled up, each eventually timing out on its own. Only the
+  # latest commit's docs are ever worth deploying, so cancelling a superseded run outright
+  # (it hasn't started actually uploading yet if it's still queued) is strictly better than
+  # waiting for it to time out. See CLAUDE.md's roadmap step 16 for the incident this fixed.
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v9.0.0
@@ -30,6 +39,12 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # Defense in depth: actions/deploy-pages already gives up after its own 10-minute
+    # internal poll timeout (the `timeout` input, left at its default) and cancels the
+    # deployment itself, but bounding the job too means a run can never sit "in progress"
+    # in the Actions UI for longer than this even if that internal timeout logic ever
+    # misbehaves.
+    timeout-minutes: 12
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
