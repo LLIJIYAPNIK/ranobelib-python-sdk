@@ -222,12 +222,24 @@ extra request it didn't need before this feature, only when `branch_id` isn't al
 so they get the ambiguity check for free. This cost is expected to shrink once the disk
 cache (roadmap step 10) makes repeated `/chapters` fetches for the same title free.
 
-`get_volume()`/`get_volumes()`/`get_chapters()` do not yet expose a way to pick a specific
+`get_volume()`/`get_volumes()`/`get_chapters()` do not expose a way to pick a specific
 `branch_id` per chapter when fetching in bulk (their signatures don't have room for a
 per-chapter override) — they only raise if any chapter they touch turns out to be ambiguous.
-Per-chapter override for the bulk methods is left as a future enhancement if it turns out to
-be needed; `get_chapter(..., branch_id=...)` already covers the single-chapter case the
-public API's quickstart shows it for.
+`get_chapter(..., branch_id=...)` already covers the single-chapter case the public API's
+quickstart shows it for.
+
+Title-wide bulk download (`download_title()`, roadmap step 20) needed a real answer to this
+rather than "future enhancement" — it can hit many ambiguous chapters across a whole title,
+and stopping at the first one (like `get_volume()` does) would mean fixing one, rerunning,
+hitting the next, rerunning again. It resolves this two ways instead, both optional and
+mutually exclusive: `branch_id` (same `branch_id` applied wherever a chapter has it —
+meaningful because `branch_id` is a stable translation-line id, not a per-chapter revision
+id, see above) or `translation_index` (position in each ambiguous chapter's `branches` list —
+a fallback for when the same team doesn't share one `branch_id` across every chapter, or
+doesn't appear on every chapter at all). Without either, or when the given one doesn't
+resolve every ambiguous chapter, it raises `MultipleTitleTranslationsError` listing *all*
+unresolved chapters at once (checked up front, not one failure at a time) — same "don't
+guess" principle as `MultipleTranslationsError`, just batched for the bulk case.
 
 ### Rate limiting и retry: ручная реализация вместо `tenacity`
 
