@@ -1,8 +1,10 @@
 """Unit tests for ranobelib.exceptions."""
 
 from ranobelib.exceptions import (
+    AmbiguousChapter,
     AuthRequiredError,
     ChapterNotFoundError,
+    MultipleTitleTranslationsError,
     MultipleTranslationsError,
     RanobeLibError,
     RateLimitError,
@@ -94,3 +96,28 @@ def test_multiple_translations_error_carries_lookup_details_and_branches() -> No
     assert "11407--solo-leveling" in str(error)
     assert "branch_id=2251 (BerkuD13)" in str(error)
     assert "branch_id=635 (ItsEND)" in str(error)
+
+
+def test_multiple_title_translations_error_lists_every_ambiguous_chapter() -> None:
+    team = Team(id=13375, slug="berkud13", slug_url="13375--berkud13", name="BerkuD13")
+    branches = [
+        _branch(branch_id=2251, teams=[team], username="Birdzz"),
+        _branch(branch_id=635, teams=[], username="ItsEND"),
+    ]
+    chapters = [
+        AmbiguousChapter(volume="1", number="0", branches=branches),
+        AmbiguousChapter(volume="1", number="1", branches=branches),
+    ]
+
+    error = MultipleTitleTranslationsError("11407--solo-leveling", chapters=chapters)
+
+    assert isinstance(error, RanobeLibError)
+    assert error.slug_url == "11407--solo-leveling"
+    assert error.chapters == chapters
+    message = str(error)
+    assert "11407--solo-leveling" in message
+    assert "download_title()" in message
+    assert "volume='1' number='0'" in message
+    assert "volume='1' number='1'" in message
+    assert "branch_id=2251 (BerkuD13)" in message
+    assert "branch_id=635 (ItsEND)" in message

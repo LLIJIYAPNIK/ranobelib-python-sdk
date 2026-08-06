@@ -1,0 +1,84 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      host:
+      - api.cdnlibs.org
+      site-id:
+      - '3'
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/manga/113306--bungou-stray-dogs-gaiden-ayatsuji-yukito-vs-kyogoku-natsuhiko/chapters
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA+1ZS2/iSBD+K8iXveDQL+PHbTS7l53DSBNWWu0wQsZ2Ahljs9iOyET8963uapsG
+        HMY8cpgVKAG3u1zVbld9X1X51YrDMrSCr6/WPLYC6pGh5wz71jyLkzWM4ahMFpOsWkyTlRo/52m1
+        SKzAolbfqs9bpBlMiiTKszhcvdQyoRIfV0TQB/ktiPzmifqeGsc86MkRZcY5YRyrqzleLZQow4Gj
+        hHwU7Y0Hpho1J1w1h8ekkYi2ys1FCSrPiwjuaboKs2iWFJMor7LSCtj21OGmofBEbSTzHdG3olUS
+        lkk8CeFSixHGbEJt5o6oG3AWkOEdUZ9/wFKZhIui0cl814HNL9LqEa6Mwx9hWs7XICbPTKpVKvVJ
+        Gds2Jhd5nMgZqUs+ENx5QyDKn+VjfLUe5mmipz+J+Xr948+oePl4L9cxg2edhXOpZ1aWyyIYD8YD
+        deFdFGfpfFrc5avH8aBapnkYF+OBtDYe1Fa07Hhg6p0orXdPy0ewECcPYZXKHbmefuaQNXeItrAA
+        V34n5ZvNt76VrJfzFTzW8mUJkUD6VlXgtsrfw12XDuEQ5jF/s+ljoDHO3KHj1d7U+Ixz6DPcJsym
+        dEQJKAmIOOIznLqNz4DXpt9DO86LMrRLcONi33tA2rZbxdr96KPS+LtUONL62vzpef13uig+/Pvh
+        rz++X+BPhwtrPMu0cAXP6mrpQh87x0xnb1vO8gL+V/IDmy49jrmuS4inVEyrLE4T5WVZlaZbLxTE
+        YYBTGu4B3XbgHsbtcL/F/qNwj+gcKjRlPYrwzhBdEeSVhMZePH5AYB+agK2OlRrNGupiESlRzvCH
+        KynFKjsKnQbukT9M3kF2QfqI1TJBJ9IHQ65Si+Vqjiews10IgXG9rXuE8GZw+yNKA4cG4hgh3IL7
+        HNo4J+r61skEco6ZqwS35hNI3FxvCOi/53K3HKTJba7AFMdznAv5obvyzo5Tq9SMUOcgkMG8QQjU
+        o4TQLSHwPUKAcTshMDCBxcAJhMB0vo+4rJPzLe5zzPExG+cI0sglRtYvkEc0QKuLfeQDRG4UxfQf
+        kR+nKRIFCuGEeazJBDWhKBoyGQNrFygnZDmjyQUHLVJKSDMW2kMhkwENIkLKEcqEaCiMqXXhPdcV
+        S0NYeJOeNKQrGFwyWgMdcpm4UWhI33BHVmt8oyvE+CPiBZwElBxJWW9lzill1C8DMU2Z43k+g0J2
+        z2faMyFuM0+Vxg40Io74zC0TumVCJ5U5DidUJke6zJH8Zna1YNzOavwCVmMIxwjvCmk1bEc9SZYY
+        ENvGUhMjidEEqtfdKXpcm3oj4geMQG/pFj23JsFBS+rMJoHHPEplawB7woDdO9ED4/boEe8TPTIo
+        O0VPve6fR49QLTZnBKEDf+TtfMXhnPpNi20VRlGeZ4Wt+61Gb1YJ2va+RHtj7Qvq+a3oaUVtbbUv
+        93Hx9Pl+NH2ayd7uuW3anRU1HTVT+RXqpA5GLsxkTrTQuWKSOTLFIgNTbaMoMF8i8FCl0zundM1g
+        qwRcp96YdBtKOGb06s2DULm6rmz01fBoZfPOJ8Slw6O9O4/DB5xRh6V8aWOSGozbw9J5n7CU0d4t
+        LPW6u4alP2IsECLg/pukdgvLTq9oTgyaM9pgJ1r4P4Xlt81/y89muEwdAAA=
+    headers:
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Thu, 06 Aug 2026 04:22:55 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=ajorPEJibEhzGpoB; Domain=.cdnlibs.org; Path=/; Expires=Thu, 06-Aug-2026
+        04:42:55 GMT
+      - __ddg10_=1785990175; Domain=.cdnlibs.org; Path=/; Expires=Thu, 06-Aug-2026
+        04:42:55 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Thu, 06-Aug-2026
+        04:42:55 GMT
+      - __ddg1_=9DAcD3UqJWNQxebOZ6rX; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Fri,
+        06-Aug-2027 04:22:55 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '96'
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1
