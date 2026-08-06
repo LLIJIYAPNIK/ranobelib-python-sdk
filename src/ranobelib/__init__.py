@@ -13,6 +13,7 @@ from ranobelib.exceptions import (
 )
 from ranobelib.models import Chapter, ChapterBranch, Title, Volume
 from ranobelib.sdk import RanobeLib
+from ranobelib.sizing import chapter_size, volume_size
 
 __all__ = [
     "AmbiguousChapter",
@@ -29,4 +30,6 @@ __all__ = [
     "TitleNotFoundError",
     "Volume",
     "VolumeNotFoundError",
+    "chapter_size",
+    "volume_size",
 ]
