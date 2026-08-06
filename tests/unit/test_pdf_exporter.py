@@ -167,3 +167,28 @@ async def test_pdf_exporter_handles_no_cover_and_no_chapters(tmp_path: Path) -> 
 
     reader = PdfReader(output_path)
     assert "Empty Book" in reader.pages[0].extract_text()
+
+
+@needs_weasyprint
+async def test_pdf_exporter_calls_on_chapter_once_per_chapter(tmp_path: Path) -> None:
+    from ranobelib.exporters.pdf import PdfExporter
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404)
+
+    title = _title()
+    chapters = [
+        _chapter(volume="1", number="1", name=None, content="<p>A</p>"),
+        _chapter(volume="1", number="2", name=None, content="<p>B</p>"),
+    ]
+    calls = 0
+
+    def on_chapter() -> None:
+        nonlocal calls
+        calls += 1
+
+    await PdfExporter(transport=httpx.MockTransport(handler)).export(
+        title, chapters, tmp_path / "out.pdf", on_chapter=on_chapter
+    )
+
+    assert calls == 2
