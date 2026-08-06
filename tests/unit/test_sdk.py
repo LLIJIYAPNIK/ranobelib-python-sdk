@@ -1,10 +1,15 @@
 """Unit tests for ranobelib.sdk helpers."""
 
+import io
+from pathlib import Path
 from typing import Any
 
 import pytest
+from rich.console import Console
 
-from ranobelib.models import Chapter
+from ranobelib.console import Reporter
+from ranobelib.exporters import EXPORTERS
+from ranobelib.models import Chapter, Title
 from ranobelib.sdk import RanobeLib, _group_into_volumes, _resolve_bulk_branch_id
 
 
@@ -265,3 +270,104 @@ async def test_estimate_title_size_raises_value_error_for_non_positive_sample_si
     async with RanobeLib("1--slug") as lib:
         with pytest.raises(ValueError, match="sample_size"):
             await lib.estimate_title_size(sample_size=0)
+
+
+def _reporter_with_buffer(verbosity: str) -> tuple[Reporter, io.StringIO]:
+    buffer = io.StringIO()
+    console = Console(file=buffer, force_terminal=False, width=80)
+    return Reporter(verbosity, console=console), buffer  # type: ignore[arg-type]
+
+
+async def test_download_title_progress_bar_shows_up_in_progress_only_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_chapters = [_raw_toc_chapter("1", str(index)) for index in range(3)]
+
+    async def fake_get_chapters(*, refresh: bool = False) -> list[dict[str, Any]]:
+        return raw_chapters
+
+    async def fake_fetch_chapter(
+        volume_str: str, number: str, branch_id: int | None, *, refresh: bool = False
+    ) -> Chapter:
+        return _fake_content_chapter(volume_str, number, branch_id)
+
+    reporter, buffer = _reporter_with_buffer("progress_only")
+    async with RanobeLib("1--slug") as lib:
+        monkeypatch.setattr(lib, "_get_chapters", fake_get_chapters)
+        monkeypatch.setattr(lib, "_fetch_chapter", fake_fetch_chapter)
+        lib._reporter = reporter
+
+        await lib.download_title()
+
+    assert "1--slug" in buffer.getvalue()
+
+
+async def test_download_title_full_mode_logs_cache_and_api_fetches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_chapters = [_raw_toc_chapter("1", "0")]
+
+    async def fake_get_chapters(*, refresh: bool = False) -> list[dict[str, Any]]:
+        return raw_chapters
+
+    reporter, buffer = _reporter_with_buffer("full")
+    async with RanobeLib("1--slug") as lib:
+        monkeypatch.setattr(lib, "_get_chapters", fake_get_chapters)
+        lib._reporter = reporter
+        # Prime the disk cache for chapter "0" so the fetch is served from cache, not the API.
+        lib._cache.set("chapter:1--slug:1:0:None", {"id": 1, "volume": "1", "number": "0"})
+
+        await lib.download_title()
+
+    output = buffer.getvalue()
+    assert "[cache] chapter 1/0" in output
+
+
+async def test_export_wires_on_chapter_to_progress_bar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _RecordingExporter:
+        format = "recording-test-format"
+
+        async def export(
+            self,
+            title: Title,
+            chapters: list[Chapter],
+            output_path: Path,
+            *,
+            on_chapter: Any = None,
+        ) -> Path:
+            for _ in chapters:
+                if on_chapter is not None:
+                    on_chapter()
+            output_path.write_text("ok")
+            return output_path
+
+    EXPORTERS["recording-test-format"] = _RecordingExporter
+    try:
+        reporter, buffer = _reporter_with_buffer("progress_only")
+        chapters = [
+            _fake_content_chapter("1", "0", None),
+            _fake_content_chapter("1", "1", None),
+        ]
+
+        async def fake_get_title(*, refresh: bool = False) -> dict[str, Any]:
+            return {
+                "id": 1,
+                "name": "Title",
+                "slug": "1--slug",
+                "slug_url": "1--slug",
+                "cover": {},
+                "age_restriction": {"id": 0, "label": "16+"},
+                "status": {"id": 1, "label": "Ongoing"},
+            }
+
+        async with RanobeLib("1--slug") as lib:
+            monkeypatch.setattr(lib, "_get_title", fake_get_title)
+            lib._reporter = reporter
+
+            await lib.export(chapters, fmt="recording-test-format", path=tmp_path / "out")
+    finally:
+        del EXPORTERS["recording-test-format"]
+
+    assert "Exporting to recording-test-format" in buffer.getvalue()

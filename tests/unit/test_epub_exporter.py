@@ -183,3 +183,25 @@ async def test_epub_exporter_skips_cover_on_any_http_error(
     book = ebooklib_epub.read_epub(str(output_path))
     file_names = {item.file_name for item in book.get_items()}
     assert "cover.jpg" not in file_names
+
+
+async def test_epub_exporter_calls_on_chapter_once_per_chapter(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"IMAGEBYTES")
+
+    title = _title()
+    chapters = [
+        _chapter(volume="1", number="1", name=None, content="<p>A</p>"),
+        _chapter(volume="1", number="2", name=None, content="<p>B</p>"),
+    ]
+    calls = 0
+
+    def on_chapter() -> None:
+        nonlocal calls
+        calls += 1
+
+    await EpubExporter(transport=httpx.MockTransport(handler)).export(
+        title, chapters, tmp_path / "out.epub", on_chapter=on_chapter
+    )
+
+    assert calls == 2
