@@ -19,6 +19,7 @@ from ranobelib.exceptions import (
 from ranobelib.exporters import EXPORTERS
 from ranobelib.models import Chapter, ChapterBranch, Title, Volume
 from ranobelib.numbering import parse_slug_url
+from ranobelib.sizing import DEFAULT_AVERAGE_IMAGE_SIZE, DEFAULT_SAMPLE_SIZE, chapter_size
 
 _INFO_FIELDS = [
     "background",
@@ -293,6 +294,92 @@ class RanobeLib:
             if chapter_delay and index < len(planned) - 1:
                 await asyncio.sleep(chapter_delay)
         return _group_into_volumes(chapters)
+
+    async def estimate_title_size(
+        self,
+        *,
+        sample_size: int = DEFAULT_SAMPLE_SIZE,
+        average_image_size: int = DEFAULT_AVERAGE_IMAGE_SIZE,
+        branch_id: int | None = None,
+        translation_index: int | None = None,
+    ) -> int:
+        """Estimate the whole title's download size in bytes, from a sample of its chapters.
+
+        Fetches the chapter list (cheap, cached), then the content of up to ``sample_size``
+        chapters spread evenly across the title — not just the first ones, since early and
+        late chapters can differ in length — and extrapolates the sample's average
+        ``sizing.chapter_size()`` across the title's total chapter count. This trades
+        exactness for cost: an exact total requires fetching every chapter's content, the
+        same cost as ``download_title()`` itself, which defeats the purpose of checking
+        "is this worth downloading" *before* paying that cost.
+
+        Sampled chapters go through the same disk cache as any other chapter fetch, so a
+        later ``download_title()`` call doesn't refetch them.
+
+        Args:
+            sample_size: How many chapters to sample. Clamped to the number of chapters the
+                title actually has (or that resolve to a usable translation, see below) if
+                that's fewer.
+            average_image_size: Forwarded to ``sizing.chapter_size()`` for each sampled
+                chapter.
+            branch_id: Same meaning as ``download_title(branch_id=...)`` — which translation
+                to sample for chapters that have more than one. Mutually exclusive with
+                ``translation_index``.
+            translation_index: Same meaning as ``download_title(translation_index=...)``.
+                Mutually exclusive with ``branch_id``.
+
+        Returns:
+            The estimated size in bytes, or ``0`` if the title has no chapters, or none of
+            its chapters have a translation ``branch_id``/``translation_index`` resolves.
+
+        Raises:
+            ValueError: If both ``branch_id`` and ``translation_index`` are given, or if
+                ``sample_size`` is less than 1.
+
+        Note:
+            Unlike ``download_title()``, a chapter with more than one translation that
+            ``branch_id``/``translation_index`` doesn't resolve is skipped when picking the
+            sample rather than raising ``MultipleTitleTranslationsError`` — an estimate
+            doesn't need a specific translation to be correct, only *a* chapter's worth of
+            this title's content to measure.
+        """
+        if branch_id is not None and translation_index is not None:
+            raise ValueError("Pass at most one of branch_id or translation_index, not both.")
+        if sample_size < 1:
+            raise ValueError(f"sample_size must be at least 1, got {sample_size}.")
+
+        raw_chapters = await self._get_chapters()
+        if not raw_chapters:
+            return 0
+
+        resolvable: list[tuple[str, str, int | None]] = []
+        for item in raw_chapters:
+            volume_str: str = item["volume"]
+            number: str = item["number"]
+            branches = item.get("branches") or []
+            if len(branches) <= 1:
+                resolvable.append((volume_str, number, None))
+                continue
+            resolved, selected = _resolve_bulk_branch_id(
+                branches, branch_id=branch_id, translation_index=translation_index
+            )
+            if resolved:
+                resolvable.append((volume_str, number, selected))
+
+        if not resolvable:
+            return 0
+
+        size = min(sample_size, len(resolvable))
+        step = max(1, len(resolvable) // size)
+        sample = [resolvable[index] for index in range(0, len(resolvable), step)][:size]
+
+        total_sample_bytes = 0
+        for volume_str, number, selected_branch_id in sample:
+            chapter = await self._fetch_chapter(volume_str, number, selected_branch_id)
+            total_sample_bytes += chapter_size(chapter, average_image_size=average_image_size)
+
+        average_bytes = total_sample_bytes / len(sample)
+        return round(average_bytes * len(raw_chapters))
 
     async def export(self, chapters: list[Chapter], *, fmt: str, path: str | Path) -> Path:
         """Export chapters to a file.

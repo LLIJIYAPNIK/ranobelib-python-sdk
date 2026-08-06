@@ -30,6 +30,12 @@
 
 ::: ranobelib.RateLimitError
 
+## Sizing
+
+::: ranobelib.chapter_size
+
+::: ranobelib.volume_size
+
 ## Exporters
 
 Not re-exported from the top-level `ranobelib` package — import from `ranobelib.exporters`.
