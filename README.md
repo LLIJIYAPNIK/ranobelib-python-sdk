@@ -77,7 +77,7 @@ copy-pasteable code.
 Full API reference and guides: **<https://LLIJIYAPNIK.github.io/ranobelib-python-sdk/>**
 (built with `mkdocs-material` + `mkdocstrings`, deployed on push to `main`). `CLAUDE.md`
 documents the full architecture, public API contract, and the reasoning behind the SDK's
-design decisions.
+design decisions. [`CHANGELOG.md`](CHANGELOG.md) lists what changed in each release.
 
 ## License
 

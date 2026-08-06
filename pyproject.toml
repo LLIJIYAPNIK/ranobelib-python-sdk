@@ -31,6 +31,7 @@ dependencies = [
 Homepage = "https://github.com/LLIJIYAPNIK/ranobelib-python-sdk"
 Repository = "https://github.com/LLIJIYAPNIK/ranobelib-python-sdk"
 Issues = "https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/issues"
+Changelog = "https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["uv_build>=0.11.26,<0.12.0"]
