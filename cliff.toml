@@ -53,20 +53,23 @@ tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
 topo_order = false
 sort_commits = "oldest"
 
-# Only commit types that describe a user-facing change to the published package get a
-# changelog entry — `test:`/`chore:`/`ci:`/`style:`/`refactor:` commits are implementation
-# detail (this repo commits atomically per sub-step, see CLAUDE.md's Git workflow section,
-# so there are many of them per feature) and would drown out what actually changed for
-# someone installing the package.
+# Only commit types that describe a user-facing change get a changelog entry —
+# `test:`/`chore:`/`docs:`/`style:`/`refactor:` commits are implementation detail (this repo
+# commits atomically per sub-step, see CLAUDE.md's Git workflow section, so there are many of
+# them per feature) and would drown out what actually changed. `ci:` is the exception: unlike
+# the others, this repo's `ci:` commits are typically user-relevant project changes in their
+# own right (new automation, new release/publishing infra), not internal noise — a release
+# made up entirely of `ci:` commits (e.g. v0.3.0, which only added CHANGELOG.md automation)
+# should still show up instead of being silently dropped for having zero feat/fix/perf.
 commit_parsers = [
     { message = "^feat", group = "Added" },
     { message = "^fix", group = "Fixed" },
     { message = "^perf", group = "Performance" },
+    { message = "^ci", group = "Changed" },
     { message = "^refactor", skip = true },
     { message = "^docs", skip = true },
     { message = "^test", skip = true },
     { message = "^chore", skip = true },
-    { message = "^ci", skip = true },
     { message = "^style", skip = true },
     { message = "^build", skip = true },
 ]
