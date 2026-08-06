@@ -121,3 +121,29 @@ async def test_txt_exporter_handles_no_chapters(tmp_path: Path, chapters: list[C
     await TxtExporter().export(title, chapters, output_path)
 
     assert output_path.read_text(encoding="utf-8").strip() == "Empty Book"
+
+
+async def test_txt_exporter_calls_on_chapter_once_per_chapter(tmp_path: Path) -> None:
+    title = _title()
+    chapters = [
+        _chapter(volume="1", number="1", name=None, content="<p>A</p>"),
+        _chapter(volume="1", number="2", name=None, content="<p>B</p>"),
+    ]
+    calls = 0
+
+    def on_chapter() -> None:
+        nonlocal calls
+        calls += 1
+
+    await TxtExporter().export(title, chapters, tmp_path / "out.txt", on_chapter=on_chapter)
+
+    assert calls == 2
+
+
+async def test_txt_exporter_works_without_on_chapter(tmp_path: Path) -> None:
+    title = _title()
+    chapters = [_chapter(volume="1", number="1", name=None, content="<p>A</p>")]
+
+    result = await TxtExporter().export(title, chapters, tmp_path / "out.txt")
+
+    assert result.exists()
