@@ -9,6 +9,12 @@ project follows [Semantic Versioning](https://semver.org/). Entries are generate
 `main` whenever a GitHub Release is published — don't hand-edit released sections, fix the
 underlying commit message/PR title instead and let the next release regenerate this file.
 
+## [0.3.0] - 2026-08-06
+
+### Changed
+
+- Generate CHANGELOG.md from Conventional Commits via git-cliff
+
 ## [0.2.0] - 2026-08-06
 
 ### Added
@@ -48,11 +54,19 @@ underlying commit message/PR title instead and let the next release regenerate t
 - Add PdfExporter
 - Set up the mkdocs-material documentation site
 
+### Changed
+
+- Add GitHub Actions workflow
+- Add docs build check to ci.yml and a deploy workflow
+- Upload coverage to Coveralls from the test job
+- Add release.yml to publish to PyPI via Trusted Publishing
+
 ### Fixed
 
 - Pin setup-uv to an existing tag
 - Make Exporter.export async
 
+[0.3.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.2.0..v0.3.0
 [0.2.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.1.0..v0.2.0
 [0.1.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/tree/v0.1.0
 
