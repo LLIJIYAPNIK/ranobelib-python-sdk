@@ -1,0 +1,72 @@
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project are documented here.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
+project follows [Semantic Versioning](https://semver.org/). Entries are generated from
+[Conventional Commits](https://www.conventionalcommits.org/) messages by `cliff.toml` +
+`.github/workflows/changelog.yml`, which regenerates this whole file and pushes it to
+`main` whenever a GitHub Release is published — don't hand-edit released sections, fix the
+underlying commit message/PR title instead and let the next release regenerate this file.
+
+"""
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | upper_first }}
+    {% for commit in commits %}
+        - {{ commit.message | upper_first }}\
+    {% endfor %}
+{% endfor %}
+
+"""
+trim = true
+footer = """
+{% for release in releases -%}
+    {% if release.version -%}
+        {% if release.previous.version -%}
+            [{{ release.version | trim_start_matches(pat="v") }}]: \
+                https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
+                    /compare/{{ release.previous.version }}..{{ release.version }}
+        {% else -%}
+            [{{ release.version | trim_start_matches(pat="v") }}]: \
+                https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}\
+                    /tree/{{ release.version }}
+        {% endif -%}
+    {% endif -%}
+{% endfor %}
+"""
+postprocessors = []
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+filter_commits = true
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+topo_order = false
+sort_commits = "oldest"
+
+# Only commit types that describe a user-facing change to the published package get a
+# changelog entry — `test:`/`chore:`/`ci:`/`style:`/`refactor:` commits are implementation
+# detail (this repo commits atomically per sub-step, see CLAUDE.md's Git workflow section,
+# so there are many of them per feature) and would drown out what actually changed for
+# someone installing the package.
+commit_parsers = [
+    { message = "^feat", group = "Added" },
+    { message = "^fix", group = "Fixed" },
+    { message = "^perf", group = "Performance" },
+    { message = "^refactor", skip = true },
+    { message = "^docs", skip = true },
+    { message = "^test", skip = true },
+    { message = "^chore", skip = true },
+    { message = "^ci", skip = true },
+    { message = "^style", skip = true },
+    { message = "^build", skip = true },
+]
