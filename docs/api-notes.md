@@ -151,10 +151,17 @@ the entry whose `name` equals that id, then prepend `https://ranobelib.me` to it
 get the same absolute URL shape the HTML-string format embeds directly. `attachments` is
 empty (`[]`) for chapters with no images, present alongside either content format.
 
-The SDK normalizes both formats into a single HTML fragment on `Chapter.content` (string
-format: passed through as-is; prosemirror format: rendered with the same tag vocabulary —
-`<p>`, `<img loading="lazy" src="...">`, `<strong>`, `<em>`, `<br />`, `<hr />` — so
-exporters only ever handle one shape), see `models.py`.
+The SDK normalizes both formats into a single HTML fragment on `Chapter.content` — prosemirror
+format: rendered with the restricted tag vocabulary (`<p>`, `<img loading="lazy" src="...">`,
+`<strong>`, `<em>`, `<br />`, `<hr />`); string format: **sanitized down to that same
+vocabulary**, not passed through as-is — the site's own markup isn't SDK-generated and can
+carry tags/attributes outside it (`data-paragraph-index`, `b`/`i` instead of `strong`/`em`, or
+worse, see the tag survey above). `b`/`i` are folded into `strong`/`em`; every other
+unrecognized tag is dropped (its text kept, except inside `script`/`style`, which drop their
+text too); every attribute is dropped except `img`'s `src`, and only when it resolves to an
+`http(s)` URL. So exporters only ever handle one shape *and* `Chapter.content` is safe to
+render as raw HTML regardless of which format the API used for a given chapter — see
+`_sanitize_content_html`/`_ContentSanitizer` in `models.py`.
 
 ### No bulk "volume content" endpoint
 

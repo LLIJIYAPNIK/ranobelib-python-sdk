@@ -29,7 +29,9 @@ def test_chapter_size_adds_average_size_per_image() -> None:
     content = '<p>text</p><img src="https://ranobelib.me/a.jpg" />'
     chapter = _chapter(content)
 
-    expected = len(content.encode()) + DEFAULT_AVERAGE_IMAGE_SIZE
+    # chapter.content is the sanitized form (see test_chapter_content.py), not the raw
+    # `content` passed in above — that's what chapter_size actually measures.
+    expected = len(chapter.content.encode()) + DEFAULT_AVERAGE_IMAGE_SIZE  # type: ignore[union-attr]
     assert chapter_size(chapter) == expected
 
 
@@ -37,7 +39,7 @@ def test_chapter_size_counts_multiple_images() -> None:
     content = '<img src="https://ranobelib.me/a.jpg" /><img src="https://ranobelib.me/b.jpg" />'
     chapter = _chapter(content)
 
-    expected = len(content.encode()) + 2 * DEFAULT_AVERAGE_IMAGE_SIZE
+    expected = len(chapter.content.encode()) + 2 * DEFAULT_AVERAGE_IMAGE_SIZE  # type: ignore[union-attr]
     assert chapter_size(chapter) == expected
 
 
@@ -45,7 +47,8 @@ def test_chapter_size_accepts_custom_average_image_size() -> None:
     content = '<img src="https://ranobelib.me/a.jpg" />'
     chapter = _chapter(content)
 
-    assert chapter_size(chapter, average_image_size=1_000) == len(content.encode()) + 1_000
+    expected = len(chapter.content.encode()) + 1_000  # type: ignore[union-attr]
+    assert chapter_size(chapter, average_image_size=1_000) == expected
 
 
 def test_chapter_size_raises_value_error_when_content_not_fetched() -> None:

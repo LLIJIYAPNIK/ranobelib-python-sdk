@@ -12,12 +12,80 @@ BASE_CHAPTER: dict[str, Any] = {
 }
 
 
-def test_chapter_content_string_passthrough() -> None:
+def test_chapter_content_string_strips_editor_attributes() -> None:
+    # data-paragraph-index is a pure editor artifact (see docs/api-notes.md) and isn't in
+    # the restricted tag/attribute vocabulary the sanitizer allows through.
     raw = {**BASE_CHAPTER, "content": '<p data-paragraph-index="1">Hello.</p>'}
 
     chapter = Chapter.model_validate(raw)
 
-    assert chapter.content == '<p data-paragraph-index="1">Hello.</p>'
+    assert chapter.content == "<p>Hello.</p>"
+
+
+def test_chapter_content_string_keeps_allowed_tags() -> None:
+    raw = {
+        **BASE_CHAPTER,
+        "content": (
+            "<p>a<strong>b</strong><em>c</em>d</p><hr /><p>e<br />f"
+            '<img loading="lazy" src="https://ranobelib.me/uploads/x.jpg" /></p>'
+        ),
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == (
+        "<p>a<strong>b</strong><em>c</em>d</p><hr /><p>e<br />f"
+        '<img loading="lazy" src="https://ranobelib.me/uploads/x.jpg" /></p>'
+    )
+
+
+def test_chapter_content_string_maps_b_and_i_to_strong_and_em() -> None:
+    # Observed as interchangeable with strong/em across samples, see docs/api-notes.md.
+    raw = {**BASE_CHAPTER, "content": "<p><b>bold</b> <i>italic</i></p>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p><strong>bold</strong> <em>italic</em></p>"
+
+
+def test_chapter_content_string_drops_disallowed_tags_keeps_text() -> None:
+    raw = {**BASE_CHAPTER, "content": '<p>before <a href="https://evil.example">link</a> after</p>'}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>before link after</p>"
+
+
+def test_chapter_content_string_drops_script_tag_and_its_text() -> None:
+    raw = {**BASE_CHAPTER, "content": "<p>safe</p><script>alert(document.cookie)</script>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>safe</p>"
+
+
+def test_chapter_content_string_strips_event_handler_attributes() -> None:
+    raw = {**BASE_CHAPTER, "content": '<p onclick="alert(1)">text</p>'}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>text</p>"
+
+
+def test_chapter_content_string_drops_img_with_unsafe_scheme() -> None:
+    raw = {**BASE_CHAPTER, "content": '<p><img src="javascript:alert(1)" /></p>'}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p></p>"
+
+
+def test_chapter_content_string_escapes_text() -> None:
+    raw = {**BASE_CHAPTER, "content": "<p>&lt;not a real tag&gt; &amp; &quot;quoted&quot;</p>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>&lt;not a real tag&gt; &amp; &quot;quoted&quot;</p>"
 
 
 def test_chapter_content_defaults_to_none() -> None:

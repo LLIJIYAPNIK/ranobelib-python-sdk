@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import html
 from datetime import datetime
+from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -90,6 +92,86 @@ def _prosemirror_to_html(doc: dict[str, Any], attachments: list[dict[str, Any]])
     array.
     """
     return "".join(_render_prosemirror_block(block, attachments) for block in _child_nodes(doc))
+
+
+_ALLOWED_CONTENT_TAGS = frozenset({"p", "img", "strong", "em", "br", "hr"})
+_CONTENT_TAG_ALIASES = {"b": "strong", "i": "em"}
+_VOID_CONTENT_TAGS = frozenset({"br", "hr", "img"})
+_DROPPED_CONTENT_TEXT_TAGS = frozenset({"script", "style"})
+_SAFE_IMG_SCHEMES = frozenset({"http", "https"})
+
+
+class _ContentSanitizer(HTMLParser):
+    """Rebuilds an HTML-string-format chapter body using only the same restricted tag
+    vocabulary ``_prosemirror_to_html`` already produces for the other content format
+    (``p``/``img``/``strong``/``em``/``br``/``hr``) — see ``_normalize_content``.
+
+    The HTML-string format passes the site's own markup straight from its editor (see
+    docs/api-notes.md), so unlike the prosemirror path it isn't SDK-generated and can't be
+    trusted as-is: any tag/attribute outside that vocabulary is dropped rather than kept,
+    including all attributes on the tags that are kept (``img`` is the one exception, and
+    only its ``src`` survives, and only when it resolves to an http(s) URL). ``b``/``i`` are
+    folded into ``strong``/``em`` (observed as interchangeable in samples, see
+    docs/api-notes.md) rather than dropped, since they're semantically equivalent and not a
+    safety concern. Text inside a dropped ``script``/``style`` tag is discarded rather than
+    kept as escaped text — anywhere else, a dropped tag's text content is kept (e.g. a
+    stripped ``<a href="...">text</a>`` still leaves ``text`` behind).
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._output: list[str] = []
+        self._skip_text_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._emit(tag, attrs, self_closing=False)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self._emit(tag, attrs, self_closing=True)
+
+    def _emit(self, tag: str, attrs: list[tuple[str, str | None]], *, self_closing: bool) -> None:
+        resolved = _CONTENT_TAG_ALIASES.get(tag, tag)
+        if resolved not in _ALLOWED_CONTENT_TAGS:
+            if tag in _DROPPED_CONTENT_TEXT_TAGS:
+                self._skip_text_depth += 1
+            return
+        if resolved == "img":
+            src = dict(attrs).get("src")
+            if src and urlsplit(src).scheme in _SAFE_IMG_SCHEMES:
+                self._output.append(f'<img loading="lazy" src="{html.escape(src, quote=True)}" />')
+            return
+        if resolved in _VOID_CONTENT_TAGS:
+            self._output.append(f"<{resolved} />")
+        else:
+            self._output.append(f"<{resolved}>")
+
+    def handle_endtag(self, tag: str) -> None:
+        resolved = _CONTENT_TAG_ALIASES.get(tag, tag)
+        if resolved not in _ALLOWED_CONTENT_TAGS:
+            if tag in _DROPPED_CONTENT_TEXT_TAGS and self._skip_text_depth > 0:
+                self._skip_text_depth -= 1
+            return
+        if resolved not in _VOID_CONTENT_TAGS:
+            self._output.append(f"</{resolved}>")
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_text_depth == 0:
+            self._output.append(html.escape(data))
+
+    def get_html(self) -> str:
+        return "".join(self._output)
+
+
+def _sanitize_content_html(content: str) -> str:
+    """Sanitize an HTML-string-format chapter body down to the restricted tag vocabulary.
+
+    Counterpart to ``_prosemirror_to_html`` for the other content format the API returns
+    (see docs/api-notes.md) — without this, ``Chapter.content`` would only actually be safe
+    to render as raw HTML for prosemirror-sourced chapters, not HTML-string-sourced ones.
+    """
+    sanitizer = _ContentSanitizer()
+    sanitizer.feed(content)
+    return sanitizer.get_html()
 
 
 class Cover(BaseModel):
@@ -232,9 +314,13 @@ class Chapter(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _normalize_content(cls, data: Any) -> Any:
-        if isinstance(data, dict) and isinstance(data.get("content"), dict):
-            attachments = data.get("attachments") or []
-            data = {**data, "content": _prosemirror_to_html(data["content"], attachments)}
+        if isinstance(data, dict):
+            content = data.get("content")
+            if isinstance(content, dict):
+                attachments = data.get("attachments") or []
+                data = {**data, "content": _prosemirror_to_html(content, attachments)}
+            elif isinstance(content, str):
+                data = {**data, "content": _sanitize_content_html(content)}
         return data
 
 
