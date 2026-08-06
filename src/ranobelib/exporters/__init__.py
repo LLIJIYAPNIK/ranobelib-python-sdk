@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar, Protocol, TypeVar, runtime_checkable
 
@@ -22,7 +23,14 @@ class Exporter(Protocol):
     format: ClassVar[str]
     """The registry key this exporter is selected by, e.g. ``"txt"``."""
 
-    async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+    async def export(
+        self,
+        title: Title,
+        chapters: list[Chapter],
+        output_path: Path,
+        *,
+        on_chapter: Callable[[], None] | None = None,
+    ) -> Path:
         """Write ``chapters`` (in the given order) to ``output_path``.
 
         ``async`` since embedding illustrations (epub, pdf) requires downloading them —
@@ -33,6 +41,10 @@ class Exporter(Protocol):
             title: The chapters' parent title, for metadata (name, authors, ...).
             chapters: The chapters to include, in the order they should appear.
             output_path: Where to write the exported file.
+            on_chapter: Called once per chapter processed, if given — drives
+                ``RanobeLib.export()``'s progress bar (see CLAUDE.md's roadmap step 23).
+                For epub/pdf this covers the per-chapter embedding step, not the earlier
+                illustration-download step, which isn't itself progress-reported.
 
         Returns:
             ``output_path``, once the file has been written.

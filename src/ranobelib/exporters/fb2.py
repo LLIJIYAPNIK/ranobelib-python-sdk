@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import ClassVar
@@ -126,7 +127,7 @@ def _build_description(title: Title) -> ET.Element:
     return description
 
 
-def _build_body(chapters: list[Chapter]) -> ET.Element:
+def _build_body(chapters: list[Chapter], on_chapter: Callable[[], None] | None) -> ET.Element:
     body = ET.Element(_tag("body"))
     for chapter in chapters:
         section = ET.SubElement(body, _tag("section"))
@@ -134,6 +135,8 @@ def _build_body(chapters: list[Chapter]) -> ET.Element:
         ET.SubElement(section_title, _tag("p")).text = chapter_heading(chapter)
         for paragraph in html_to_fb2_paragraphs(chapter.content or ""):
             section.append(paragraph)
+        if on_chapter is not None:
+            on_chapter()
     return body
 
 
@@ -143,20 +146,28 @@ class Fb2Exporter:
 
     format: ClassVar[str] = "fb2"
 
-    async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+    async def export(
+        self,
+        title: Title,
+        chapters: list[Chapter],
+        output_path: Path,
+        *,
+        on_chapter: Callable[[], None] | None = None,
+    ) -> Path:
         """Write ``chapters`` to ``output_path`` as FB2 XML.
 
         Args:
             title: The chapters' parent title; supplies ``description`` metadata.
             chapters: The chapters to include, in the order they should appear.
             output_path: Where to write the ``.fb2`` file.
+            on_chapter: Called once per chapter written, if given.
 
         Returns:
             ``output_path``.
         """
         root = ET.Element(_tag("FictionBook"))
         root.append(_build_description(title))
-        root.append(_build_body(chapters))
+        root.append(_build_body(chapters, on_chapter))
 
         tree = ET.ElementTree(root)
         ET.indent(tree, space="  ")

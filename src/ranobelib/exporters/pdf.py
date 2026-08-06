@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import html
+from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 
@@ -98,13 +99,23 @@ if weasyprint is not None:
             """
             self._transport = transport
 
-        async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+        async def export(
+            self,
+            title: Title,
+            chapters: list[Chapter],
+            output_path: Path,
+            *,
+            on_chapter: Callable[[], None] | None = None,
+        ) -> Path:
             """Write ``chapters`` to ``output_path`` as a PDF file.
 
             Args:
                 title: The chapters' parent title; supplies metadata, cover, and authors.
                 chapters: The chapters to include, in the order they should appear.
                 output_path: Where to write the ``.pdf`` file.
+                on_chapter: Called once per chapter rendered to HTML, if given — after
+                    illustrations have already been downloaded, see the ``Exporter``
+                    protocol's docstring.
 
             Returns:
                 ``output_path``.
@@ -135,9 +146,12 @@ if weasyprint is not None:
                 for url, data in images.items()
             }
 
-            body = _title_page_html(title, cover_data_uri) + "".join(
-                _chapter_html(chapter, url_to_data_uri) for chapter in chapters
-            )
+            chapter_html_parts = []
+            for chapter in chapters:
+                chapter_html_parts.append(_chapter_html(chapter, url_to_data_uri))
+                if on_chapter is not None:
+                    on_chapter()
+            body = _title_page_html(title, cover_data_uri) + "".join(chapter_html_parts)
             document = (
                 f"<html><head><meta charset='utf-8'><style>{_PAGE_CSS}</style></head>"
                 f"<body>{body}</body></html>"

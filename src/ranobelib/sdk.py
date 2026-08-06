@@ -9,6 +9,7 @@ from typing import Any, Self
 
 from ranobelib.cache import DEFAULT_CACHE_DIR, DiskCache
 from ranobelib.client import ApiClient
+from ranobelib.console import Reporter, Verbosity
 from ranobelib.exceptions import (
     AmbiguousChapter,
     ChapterNotFoundError,
@@ -52,6 +53,7 @@ class RanobeLib:
         *,
         cache_dir: str | Path | None = None,
         cache_ttl: float | None = None,
+        verbosity: Verbosity = False,
     ) -> None:
         """Initialize the SDK for a title.
 
@@ -64,12 +66,18 @@ class RanobeLib:
             cache_ttl: Seconds after which a cached response is treated as stale and
                 re-fetched. ``None`` (the default) means cached responses never expire on
                 their own — see ``refresh=True`` on individual methods to force one anyway.
+            verbosity: Console output level. ``False`` (default): silent. ``"progress_only"``:
+                progress bars during ``download_title()``/``export()``/``estimate_title_size()``.
+                ``"full"``: the same progress bars, plus a line logged for every title/
+                chapter-list/chapter-content fetch, noting whether it was served from the
+                disk cache or the API.
         """
         self._slug_url = parse_slug_url(url)
         self._client = ApiClient()
         self._cache = DiskCache(
             cache_dir if cache_dir is not None else DEFAULT_CACHE_DIR, ttl=cache_ttl
         )
+        self._reporter = Reporter(verbosity)
 
     async def __aenter__(self) -> Self:
         return self
@@ -289,10 +297,12 @@ class RanobeLib:
             raise MultipleTitleTranslationsError(self._slug_url, chapters=unresolved)
 
         chapters = []
-        for index, (volume_str, number, selected_branch_id) in enumerate(planned):
-            chapters.append(await self._fetch_chapter(volume_str, number, selected_branch_id))
-            if chapter_delay and index < len(planned) - 1:
-                await asyncio.sleep(chapter_delay)
+        with self._reporter.progress(f"Downloading {self._slug_url}", len(planned)) as advance:
+            for index, (volume_str, number, selected_branch_id) in enumerate(planned):
+                chapters.append(await self._fetch_chapter(volume_str, number, selected_branch_id))
+                advance()
+                if chapter_delay and index < len(planned) - 1:
+                    await asyncio.sleep(chapter_delay)
         return _group_into_volumes(chapters)
 
     async def estimate_title_size(
@@ -374,9 +384,11 @@ class RanobeLib:
         sample = [resolvable[index] for index in range(0, len(resolvable), step)][:size]
 
         total_sample_bytes = 0
-        for volume_str, number, selected_branch_id in sample:
-            chapter = await self._fetch_chapter(volume_str, number, selected_branch_id)
-            total_sample_bytes += chapter_size(chapter, average_image_size=average_image_size)
+        with self._reporter.progress(f"Sampling {self._slug_url}", len(sample)) as advance:
+            for volume_str, number, selected_branch_id in sample:
+                chapter = await self._fetch_chapter(volume_str, number, selected_branch_id)
+                total_sample_bytes += chapter_size(chapter, average_image_size=average_image_size)
+                advance()
 
         average_bytes = total_sample_bytes / len(sample)
         return round(average_bytes * len(raw_chapters))
@@ -398,7 +410,8 @@ class RanobeLib:
             available = ", ".join(sorted(EXPORTERS)) or "(none registered)"
             raise ValueError(f"Unknown export format {fmt!r}. Available: {available}")
         title = await self.get_info()
-        return await exporter_cls().export(title, chapters, Path(path))
+        with self._reporter.progress(f"Exporting to {fmt}", len(chapters)) as advance:
+            return await exporter_cls().export(title, chapters, Path(path), on_chapter=advance)
 
     async def _build_volume(self, volume: int, raw_chapters: list[dict[str, Any]]) -> Volume:
         volume_str = str(volume)
@@ -417,7 +430,9 @@ class RanobeLib:
         if not refresh:
             cached = self._cache.get(key)
             if cached is not None:
+                self._reporter.log(f"[cache] title metadata for {self._slug_url}")
                 return cached  # type: ignore[no-any-return]
+        self._reporter.log(f"[api] fetching title metadata for {self._slug_url}")
         data = await self._client.get_title(self._slug_url, fields=_INFO_FIELDS)
         self._cache.set(key, data)
         return data
@@ -427,7 +442,9 @@ class RanobeLib:
         if not refresh:
             cached = self._cache.get(key)
             if cached is not None:
+                self._reporter.log(f"[cache] chapter list for {self._slug_url}")
                 return cached  # type: ignore[no-any-return]
+        self._reporter.log(f"[api] fetching chapter list for {self._slug_url}")
         data = await self._client.get_chapters(self._slug_url)
         self._cache.set(key, data)
         return data
@@ -439,7 +456,9 @@ class RanobeLib:
         if not refresh:
             cached = self._cache.get(key)
             if cached is not None:
+                self._reporter.log(f"[cache] chapter {volume_str}/{number}")
                 return Chapter.model_validate(cached)
+        self._reporter.log(f"[api] fetching chapter {volume_str}/{number}")
         data = await self._client.get_chapter(
             self._slug_url, number=number, volume=volume_str, branch_id=branch_id
         )

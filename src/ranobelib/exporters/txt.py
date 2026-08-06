@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import ClassVar
@@ -69,13 +70,21 @@ class TxtExporter:
 
     format: ClassVar[str] = "txt"
 
-    async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+    async def export(
+        self,
+        title: Title,
+        chapters: list[Chapter],
+        output_path: Path,
+        *,
+        on_chapter: Callable[[], None] | None = None,
+    ) -> Path:
         """Write ``chapters`` to ``output_path`` as plain text.
 
         Args:
             title: The chapters' parent title; only its name is used.
             chapters: The chapters to include, in the order they should appear.
             output_path: Where to write the ``.txt`` file.
+            on_chapter: Called once per chapter written, if given.
 
         Returns:
             ``output_path``.
@@ -84,6 +93,8 @@ class TxtExporter:
         for chapter in chapters:
             body = html_to_text(chapter.content or "")
             sections.append(f"{chapter_heading(chapter)}\n\n{body}")
+            if on_chapter is not None:
+                on_chapter()
 
         output_path.write_text("\n\n\n".join(sections) + "\n", encoding="utf-8")
         return output_path

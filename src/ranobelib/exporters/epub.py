@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 
@@ -39,7 +40,14 @@ class EpubExporter:
         """
         self._transport = transport
 
-    async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path:
+    async def export(
+        self,
+        title: Title,
+        chapters: list[Chapter],
+        output_path: Path,
+        *,
+        on_chapter: Callable[[], None] | None = None,
+    ) -> Path:
         """Write ``chapters`` to ``output_path`` as an EPUB file.
 
         Downloads the title's cover and every image referenced in the chapters' content and
@@ -50,6 +58,8 @@ class EpubExporter:
             title: The chapters' parent title; supplies metadata, cover, and authors.
             chapters: The chapters to include, in the order they should appear.
             output_path: Where to write the ``.epub`` file.
+            on_chapter: Called once per chapter embedded, if given — after illustrations
+                have already been downloaded, see the ``Exporter`` protocol's docstring.
 
         Returns:
             ``output_path``.
@@ -107,6 +117,8 @@ class EpubExporter:
             book.add_item(doc)
             spine.append(doc)
             toc.append(doc)
+            if on_chapter is not None:
+                on_chapter()
 
         book.toc = toc
         book.add_item(epub.EpubNcx())
