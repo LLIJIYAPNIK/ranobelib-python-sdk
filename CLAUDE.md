@@ -55,6 +55,8 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
     translations = await lib.get_translations(volume=6, number="51.6")
     chapter = await lib.get_chapter(volume=6, number="51.6", branch_id=...)
 
+    all_volumes = await lib.download_title(translation_index=0, chapter_delay=0.5)
+
     await lib.export(chapters, fmt="epub", path="output.epub")
 ```
 
@@ -510,5 +512,54 @@ owner/repo/workflow-file/environment) — это может сделать то�
     источником полного API-референса — README не дублирует её, а даёт copy-paste примеры по
     каждой фиче верхнего уровня (`get_info`, `get_table_of_contents`, `get_chapter(s)`,
     `get_volume(s)`, выбор перевода, кэш, `export()` во все 4 формата, обработка исключений).
+20. **Скачивание всего тайтла целиком** — новый метод `download_title()` (публичный API,
+    контракт из раздела "Публичный API" выше дополняется этим методом; описанный там пример
+    quickstart-а не переписывается ради него — метод дополняет набор `get_*`, а не заменяет
+    ни один из них). Требования:
+    - Один вызов, без ручного перебора томов/глав пользователем — метод сам получает список
+      глав (`_get_chapters()`, как и `get_volume(s)`/`get_chapters()`) и скачивает контент
+      каждой главы, возвращая `list[Volume]` (тот же тип, что `get_table_of_contents()`, но
+      с заполненным `Chapter.content`), сгруппированный через уже существующий
+      `_group_into_volumes()`.
+    - Дополнительный, поверх уже имеющегося в `ApiClient` пейсинга/backoff (см. раздел "Rate
+      limiting и ошибки" выше — тот пейсинг никуда не девается и продолжает применяться к
+      каждому запросу), параметр `chapter_delay: float = 0.0` — дополнительная пауза после
+      каждой скачанной главы. `ApiClient`-настройки (`request_delay` и т.д.) остаются
+      client-only и не пробрасываются через `RanobeLib` (решение, зафиксированное для
+      `timeout`/`base_url` в разделе "Rate limiting и ошибки" выше) — `chapter_delay` не
+      нарушает это: это отдельная, специфичная для *bulk*-сценария пауза на уровне
+      `RanobeLib`, а не проброс клиентских настроек.
+    - Перевод при неоднозначности (`branches_count > 1`) — не гадать и не падать на первой же
+      неоднозначной главе: сначала проверяются **все** главы тайтла, и только затем (если
+      есть нерешённые) кидается одна ошибка `MultipleTitleTranslationsError` (новое
+      исключение в `exceptions.py`, `chapters: list[AmbiguousChapter]`) — со списком *всех*
+      неоднозначных глав сразу (не только первой попавшейся) и их `branch_id`-опций, чтобы
+      пользователь не чинил ошибку по одной главе за раз через повторные запуски. Это
+      закрывает пункт "per-chapter override for the bulk methods... future enhancement", про
+      который `docs/api-notes.md` (раздел "Translation selection") явно писал, что он не
+      реализован — теперь реализован, но только для `download_title()`, не для
+      `get_chapters()`/`get_volume()`/`get_volumes()` (у них по-прежнему нет per-chapter
+      выбора, см. тот же раздел `docs/api-notes.md`, актуализировать его в этом PR).
+    - Два options резолва неоднозначности, оба опциональные и взаимоисключающие
+      (`ValueError`, если переданы вместе):
+      - `branch_id: int | None` — использовать этот `branch_id` для каждой неоднозначной
+        главы, где он есть среди её `branches` (та же семантика, что уже есть у
+        `get_chapter(..., branch_id=...)`, просто применённая ко всему тайтлу сразу;
+        осмысленно благодаря тому, что `branch_id` — стабильный id "линии перевода", см.
+        `docs/api-notes.md`).
+      - `translation_index: int | None` — взять перевод по позиции в `branches` каждой
+        неоднозначной главы (`0` — первый и т.д.), т.к. одна и та же команда не обязательно
+        имеет одинаковый `branch_id` на разных главах тайтла (если она вообще есть на всех),
+        а позиция — универсальный запасной вариант "бери первый (или N-й)" из требований.
+      - Если для какой-то главы ни `branch_id`, ни валидный `translation_index` не резолвятся
+        (`branch_id` не найден среди её `branches`, либо `translation_index` вне диапазона) —
+        эта глава тоже попадает в список `MultipleTitleTranslationsError.chapters`, а не
+        падает отдельной непонятной ошибкой (`IndexError` и т.п.).
+      - Без обоих параметров — поведение по умолчанию: `MultipleTitleTranslationsError` при
+        первой же неоднозначной главе тайтла (после полной проверки всех глав, как описано
+        выше) — тот же принцип "не гадать самому", что уже принят для `get_chapter()`.
+    - `docs/api-notes.md` (раздел "Translation selection") обновить, убрав формулировку про
+      "future enhancement, если понадобится" — заменить на факт, что реализовано в
+      `download_title()`.
 
 Каждый пункт — отдельная ветка/PR по правилам из раздела Git workflow.

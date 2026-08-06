@@ -14,7 +14,8 @@ The SDK talks to the undocumented but open JSON API behind the site (`api.cdnlib
 part of the lib.social network) instead of scraping HTML.
 
 > **Status:** all the calls in the quickstart below are implemented — metadata, table of
-> contents, single/bulk chapter and volume downloads, translation selection, and export to
+> contents, single/bulk chapter and volume downloads, whole-title bulk download, translation
+> selection, and export to
 > `"txt"`, `"fb2"`, `"epub"`, or `"pdf"` (cover + in-chapter illustrations embedded in
 > epub/pdf). Raw API responses are cached to disk, and the underlying client bounds
 > concurrency, paces requests, and retries 429/5xx with backoff. `fmt="pdf"` needs
@@ -55,6 +56,8 @@ async with RanobeLib("https://ranobelib.me/ru/book/6712--high-school-dxd-novel")
 
     translations = await lib.get_translations(volume=6, number="51.6")
     chapter = await lib.get_chapter(volume=6, number="51.6", branch_id=...)
+
+    all_volumes = await lib.download_title(translation_index=0, chapter_delay=0.5)
 
     await lib.export(chapters, fmt="epub", path="output.epub")
 ```
@@ -265,6 +268,57 @@ asyncio.run(main())
 ambiguous, pick one: [2251, 635]
 <p data-paragraph-index="1">Прокачка уровня в одиночку</p><p data-paragraph-index="2">0 . Пролог</p
 ```
+
+### Downloading a whole title
+
+`download_title()` fetches every chapter of a title in one call. When a title has chapters
+with more than one translation, it raises `MultipleTitleTranslationsError` listing *all* of
+them up front (not just the first one hit) — pass `branch_id` or `translation_index` to
+resolve them:
+
+```python
+import asyncio
+
+from ranobelib import MultipleTitleTranslationsError, RanobeLib
+
+
+async def main() -> None:
+    async with RanobeLib("https://ranobelib.me/ru/book/40195--enbizaka-no-shitateya") as lib:
+        volumes = await lib.download_title(chapter_delay=0.5)
+        for volume in volumes:
+            print(volume.number, [chapter.number for chapter in volume.chapters])
+
+    slug = "113306--bungou-stray-dogs-gaiden-ayatsuji-yukito-vs-kyogoku-natsuhiko"
+    async with RanobeLib(f"https://ranobelib.me/ru/book/{slug}") as lib:
+        try:
+            await lib.download_title()
+        except MultipleTitleTranslationsError as exc:
+            print(f"{len(exc.chapters)} ambiguous chapter(s):")
+            for chapter in exc.chapters:
+                print(" ", chapter.volume, chapter.number, [b.branch_id for b in chapter.branches])
+
+        volumes = await lib.download_title(translation_index=0)
+        print([chapter.number for chapter in volumes[0].chapters])
+
+
+asyncio.run(main())
+```
+
+**Result:**
+
+```
+1 ['0', '1']
+3 ambiguous chapter(s):
+  1 0 [12954, 12955]
+  1 1 [12955, 12954]
+  1 2 [12954, 12955]
+['0', '1', '2', '3', '4', '5']
+```
+
+Note chapter `1`'s branches are listed in the opposite order from chapters `0`/`2` —
+`translation_index=0` resolves by each chapter's own branch order, not a shared `branch_id`,
+which is why it picks a different team for chapter `1` than for `0`/`2` here. Use `branch_id`
+instead when you know the specific translation you want and it's shared across chapters.
 
 ### Disk caching
 
