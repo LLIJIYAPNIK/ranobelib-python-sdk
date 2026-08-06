@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
@@ -9,7 +10,9 @@ from typing import Any, Self
 from ranobelib.cache import DEFAULT_CACHE_DIR, DiskCache
 from ranobelib.client import ApiClient
 from ranobelib.exceptions import (
+    AmbiguousChapter,
     ChapterNotFoundError,
+    MultipleTitleTranslationsError,
     MultipleTranslationsError,
     VolumeNotFoundError,
 )
@@ -215,6 +218,82 @@ class RanobeLib:
         raw_chapters = await self._get_chapters()
         return [await self._build_volume(volume, raw_chapters) for volume in volumes]
 
+    async def download_title(
+        self,
+        *,
+        branch_id: int | None = None,
+        translation_index: int | None = None,
+        chapter_delay: float = 0.0,
+    ) -> list[Volume]:
+        """Download every chapter of the title, across all its volumes.
+
+        Fetches the chapter list once, then every chapter's content, sequentially, in the
+        API's own order — same pacing/retry/backoff as any other chapter fetch (see
+        ``ApiClient``), plus ``chapter_delay`` on top if given.
+
+        Resolving translations is checked for the whole title up front, not chapter by
+        chapter: if any chapters have more than one translation, this fetches nothing and
+        raises ``MultipleTitleTranslationsError`` listing *all* of them at once (unless
+        ``branch_id`` or ``translation_index`` resolves every one of them), rather than
+        failing partway through a long download on the first ambiguous chapter.
+
+        Args:
+            branch_id: Translation to use for every chapter that has more than one — same
+                meaning as ``get_chapter(..., branch_id=...)``, applied title-wide. Chapters
+                with only one translation are unaffected. Mutually exclusive with
+                ``translation_index``.
+            translation_index: Alternative to ``branch_id``: pick the translation at this
+                position in each ambiguous chapter's ``branches`` list (``0`` for the first,
+                and so on) — useful when ambiguous chapters don't share one ``branch_id``
+                across the title. Mutually exclusive with ``branch_id``.
+            chapter_delay: Extra delay, in seconds, after fetching each chapter, on top of
+                ``ApiClient``'s own per-request pacing — to be gentler on the API during a
+                large bulk download. Defaults to no extra delay.
+
+        Raises:
+            ValueError: If both ``branch_id`` and ``translation_index`` are given.
+            MultipleTitleTranslationsError: If the title has one or more chapters with more
+                than one translation that ``branch_id``/``translation_index`` didn't resolve.
+        """
+        if branch_id is not None and translation_index is not None:
+            raise ValueError("Pass at most one of branch_id or translation_index, not both.")
+
+        raw_chapters = await self._get_chapters()
+
+        planned: list[tuple[str, str, int | None]] = []
+        unresolved: list[AmbiguousChapter] = []
+        for item in raw_chapters:
+            volume_str: str = item["volume"]
+            number: str = item["number"]
+            branches = item.get("branches") or []
+            if len(branches) <= 1:
+                planned.append((volume_str, number, None))
+                continue
+
+            resolved, selected = _resolve_bulk_branch_id(
+                branches, branch_id=branch_id, translation_index=translation_index
+            )
+            if resolved:
+                planned.append((volume_str, number, selected))
+            else:
+                unresolved.append(
+                    AmbiguousChapter(
+                        volume=volume_str,
+                        number=number,
+                        branches=[ChapterBranch.model_validate(branch) for branch in branches],
+                    )
+                )
+
+        if unresolved:
+            raise MultipleTitleTranslationsError(self._slug_url, chapters=unresolved)
+
+        chapters = []
+        for index, (volume_str, number, selected_branch_id) in enumerate(planned):
+            chapters.append(await self._fetch_chapter(volume_str, number, selected_branch_id))
+            if chapter_delay and index < len(planned) - 1:
+                await asyncio.sleep(chapter_delay)
+        return _group_into_volumes(chapters)
+
     async def export(self, chapters: list[Chapter], *, fmt: str, path: str | Path) -> Path:
         """Export chapters to a file.
 
@@ -305,6 +384,24 @@ def _group_into_volumes(chapters: list[Chapter]) -> list[Volume]:
     for chapter in chapters:
         grouped.setdefault(chapter.volume, []).append(chapter)
     return [Volume(number=number, chapters=items) for number, items in grouped.items()]
+
+
+def _resolve_bulk_branch_id(
+    branches: list[dict[str, Any]], *, branch_id: int | None, translation_index: int | None
+) -> tuple[bool, int | None]:
+    """Resolve which branch_id to request for one ambiguous chapter in ``download_title()``.
+
+    Returns ``(True, branch_id)`` if resolved, ``(False, None)`` if ``branch_id``/
+    ``translation_index`` doesn't identify one of this chapter's branches.
+    """
+    if branch_id is not None:
+        for branch in branches:
+            if branch.get("branch_id") == branch_id:
+                return True, branch_id
+        return False, None
+    if translation_index is not None and 0 <= translation_index < len(branches):
+        return True, branches[translation_index].get("branch_id")
+    return False, None
 
 
 def _find_raw_chapter(

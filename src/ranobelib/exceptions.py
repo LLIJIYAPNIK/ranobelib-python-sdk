@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
     from ranobelib.models import ChapterBranch
@@ -91,6 +91,54 @@ def _describe_branch(branch: ChapterBranch) -> str:
     if branch.teams:
         return ", ".join(team.name for team in branch.teams)
     return branch.user.username
+
+
+class AmbiguousChapter(NamedTuple):
+    """One chapter that ``RanobeLib.download_title()`` couldn't resolve a translation for.
+
+    Attributes:
+        volume: The chapter's volume number.
+        number: The chapter number.
+        branches: The chapter's available translations, as returned by
+            ``RanobeLib.get_translations()``.
+    """
+
+    volume: str
+    number: str
+    branches: list[ChapterBranch]
+
+
+class MultipleTitleTranslationsError(RanobeLibError):
+    """Raised by ``download_title()`` when one or more chapters have an unresolved translation.
+
+    Unlike ``MultipleTranslationsError`` (one chapter), this can list several: a title-wide
+    bulk download checks every chapter up front rather than stopping at the first ambiguous
+    one, so a caller doesn't have to fix one chapter, rerun, hit the next, and rerun again.
+    Pass ``branch_id`` or ``translation_index`` to ``download_title()`` to resolve them, or
+    fetch the listed chapters individually with ``get_chapter(..., branch_id=...)``.
+
+    Attributes:
+        slug_url: The title's ``{id}--{slug}`` identifier.
+        chapters: The ambiguous chapters and their available translations.
+    """
+
+    def __init__(self, slug_url: str, *, chapters: list[AmbiguousChapter]) -> None:
+        self.slug_url = slug_url
+        self.chapters = chapters
+        lines = [
+            f"  volume={chapter.volume!r} number={chapter.number!r}: "
+            + ", ".join(
+                f"branch_id={branch.branch_id} ({_describe_branch(branch)})"
+                for branch in chapter.branches
+            )
+            for chapter in chapters
+        ]
+        super().__init__(
+            f"{len(chapters)} chapter(s) in {slug_url!r} have more than one translation "
+            "unresolved by the given branch_id/translation_index. Pass branch_id or "
+            "translation_index to download_title() to select one for every chapter listed, "
+            "or fetch them individually with get_chapter(..., branch_id=...):\n" + "\n".join(lines)
+        )
 
 
 class AuthRequiredError(RanobeLibError):
