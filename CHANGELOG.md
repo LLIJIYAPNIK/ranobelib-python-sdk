@@ -9,6 +9,17 @@ project follows [Semantic Versioning](https://semver.org/). Entries are generate
 `main` whenever a GitHub Release is published — don't hand-edit released sections, fix the
 underlying commit message/PR title instead and let the next release regenerate this file.
 
+## [0.4.0] - 2026-08-06
+
+### Added
+
+- Add chapter/volume size estimation and RanobeLib.estimate_title_size()
+- Add interactive console output via verbosity parameter
+
+### Fixed
+
+- Stop dropping releases with only ci: commits from CHANGELOG.md
+
 ## [0.3.0] - 2026-08-06
 
 ### Changed
@@ -66,6 +77,7 @@ underlying commit message/PR title instead and let the next release regenerate t
 - Pin setup-uv to an existing tag
 - Make Exporter.export async
 
+[0.4.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.3.0..v0.4.0
 [0.3.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.2.0..v0.3.0
 [0.2.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.1.0..v0.2.0
 [0.1.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/tree/v0.1.0
