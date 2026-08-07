@@ -9,6 +9,13 @@ project follows [Semantic Versioning](https://semver.org/). Entries are generate
 `main` whenever a GitHub Release is published — don't hand-edit released sections, fix the
 underlying commit message/PR title instead and let the next release regenerate this file.
 
+## [0.4.1] - 2026-08-06
+
+### Fixed
+
+- Cancel superseded docs deploy runs instead of queueing them
+- Sanitize HTML-string chapter content, not just prosemirror
+
 ## [0.4.0] - 2026-08-06
 
 ### Added
@@ -77,6 +84,7 @@ underlying commit message/PR title instead and let the next release regenerate t
 - Pin setup-uv to an existing tag
 - Make Exporter.export async
 
+[0.4.1]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.4.0..v0.4.1
 [0.4.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.3.0..v0.4.0
 [0.3.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.2.0..v0.3.0
 [0.2.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.1.0..v0.2.0
