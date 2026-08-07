@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
@@ -233,6 +234,7 @@ class RanobeLib:
         branch_id: int | None = None,
         translation_index: int | None = None,
         chapter_delay: float = 0.0,
+        on_chapter: Callable[[int, int], None] | None = None,
     ) -> list[Volume]:
         """Download every chapter of the title, across all its volumes.
 
@@ -258,6 +260,12 @@ class RanobeLib:
             chapter_delay: Extra delay, in seconds, after fetching each chapter, on top of
                 ``ApiClient``'s own per-request pacing — to be gentler on the API during a
                 large bulk download. Defaults to no extra delay.
+            on_chapter: Called with ``(completed, total)`` after each chapter is fetched, if
+                given — a programmatic progress hook for callers that aren't printing to a
+                console (e.g. a web app polling/streaming download progress to a browser),
+                who would otherwise have no way to observe anything before this whole
+                ``await`` returns. Independent of ``verbosity``: both can be set at once,
+                each drives its own output.
 
         Raises:
             ValueError: If both ``branch_id`` and ``translation_index`` are given.
@@ -297,11 +305,14 @@ class RanobeLib:
             raise MultipleTitleTranslationsError(self._slug_url, chapters=unresolved)
 
         chapters = []
-        with self._reporter.progress(f"Downloading {self._slug_url}", len(planned)) as advance:
+        total = len(planned)
+        with self._reporter.progress(f"Downloading {self._slug_url}", total) as advance:
             for index, (volume_str, number, selected_branch_id) in enumerate(planned):
                 chapters.append(await self._fetch_chapter(volume_str, number, selected_branch_id))
                 advance()
-                if chapter_delay and index < len(planned) - 1:
+                if on_chapter is not None:
+                    on_chapter(index + 1, total)
+                if chapter_delay and index < total - 1:
                     await asyncio.sleep(chapter_delay)
         return _group_into_volumes(chapters)
 

@@ -74,3 +74,15 @@ async def test_download_title_applies_chapter_delay_between_chapters_not_after_l
 
     assert sleeps == [0.75]
     assert [chapter.number for chapter in volumes[0].chapters] == ["0", "1"]
+
+
+@pytest.mark.vcr
+async def test_download_title_reports_progress_via_on_chapter_callback() -> None:
+    calls: list[tuple[int, int]] = []
+
+    async with RanobeLib("https://ranobelib.me/ru/book/40195--enbizaka-no-shitateya") as lib:
+        await lib.download_title(
+            on_chapter=lambda completed, total: calls.append((completed, total))
+        )
+
+    assert calls == [(1, 2), (2, 2)]
