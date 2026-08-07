@@ -628,6 +628,19 @@ owner/repo/workflow-file/environment) — это может сделать то�
     - `docs/api-notes.md` (раздел "Translation selection") обновить, убрав формулировку про
       "future enhancement, если понадобится" — заменить на факт, что реализовано в
       `download_title()`.
+    - **Добавлено позже (issue #35):** `on_chapter: Callable[[int, int], None] | None = None`
+      — вызывается как `on_chapter(completed, total)` после каждой скачанной главы, поверх
+      уже существующего `advance()` из `self._reporter.progress()` (см. шаг 23 ниже), не
+      вместо него — `verbosity` печатает в терминал *этого* процесса, что бесполезно
+      вызывающему, который сам не терминал (например, веб-бэкенд, гоняющий
+      `download_title()` в фоновой задаче и обязанный сообщать прогресс браузеру через
+      собственный polling/SSE-эндпоинт — ровно кейс из issue). Сигнатура — `(completed,
+      total)`, а не `Callable[[], None]`, как у `Exporter.export()`'s `on_chapter` (шаг 23):
+      там `total` вызывающему уже известен (`len(chapters)`, тот же список он и передал), а
+      здесь общее число глав становится известно только после резолва неоднозначности
+      перевода внутри `download_title()`, так что отдавать его вместе с каждым тиком дешевле
+      для вызывающего, чем заставлять его самому дергать `get_table_of_contents()` только
+      ради счётчика.
 21. **`CHANGELOG.md` с автогенерацией через GitHub Actions.** Формат — [Keep a
     Changelog](https://keepachangelog.com/) + [Conventional
     Commits](https://www.conventionalcommits.org/) как источник записей (проект и так им

@@ -13,6 +13,14 @@ number). Two things make it different from the other bulk methods:
    chapter, then raises a single MultipleTitleTranslationsError listing *all* ambiguous
    chapters together — so you're not stuck fixing one chapter, rerunning, hitting the next
    ambiguous one, rerunning again, and so on.
+
+`on_chapter` — an optional `(completed: int, total: int) -> None` callback, called once
+per chapter downloaded. This is separate from the `verbosity` console progress bar (see
+CLAUDE.md's roadmap step 23): `verbosity` prints to *this process's* terminal, which is no
+help to a caller that isn't a terminal at all — e.g. a web backend running download_title()
+in a background job, which needs to report "chapter N of M" to a browser through its own
+polling/SSE status endpoint instead. Both can be used together; `on_chapter` doesn't replace
+`verbosity`.
 """
 
 import asyncio
@@ -24,9 +32,14 @@ async def main() -> None:
     # This title has no translation ambiguity, so download_title() just works with only the
     # bulk-download courtesy delay set.
     async with RanobeLib("https://ranobelib.me/ru/book/40195--enbizaka-no-shitateya") as lib:
+        # on_chapter fires once per chapter, with (completed, total) — e.g. to update a
+        # progress record a web frontend polls, independently of console verbosity.
+        def report_progress(completed: int, total: int) -> None:
+            print(f"progress: {completed}/{total}")
+
         # Returns list[Volume], the same shape get_table_of_contents() returns, but with
         # every Chapter.content already downloaded.
-        volumes = await lib.download_title(chapter_delay=0.5)
+        volumes = await lib.download_title(chapter_delay=0.5, on_chapter=report_progress)
         for volume in volumes:
             print(volume.number, [chapter.number for chapter in volume.chapters])
 
@@ -53,6 +66,8 @@ asyncio.run(main())
 
 # Expected output (real run against the live site):
 #
+# progress: 1/2
+# progress: 2/2
 # 1 ['0', '1']
 # 3 ambiguous chapter(s):
 #   1 0 [12954, 12955]
