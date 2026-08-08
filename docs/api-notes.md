@@ -324,6 +324,120 @@ worth capturing, which isn't possible in this dev environment, and CI runs with
 module docstring. The unit tests (mock transport, no cassette needed) cover the same
 download-then-render pipeline instead.
 
+### Catalog listing/search: `GET /api/manga`
+
+Researched for issue #38 (companion web UI needs catalog browsing without scraping HTML) —
+the existing "Site scoping" section above already noted this endpoint uses a `site_id[]=3`
+query parameter rather than the `Site-Id` header, and that's confirmed still true; everything
+else below is new. Checked with real `curl` requests against the live API (no test title
+needed — this endpoint lists/searches across the whole site).
+
+**Pagination — `page`/`limit`, not `page`/`per_page`:**
+
+```
+GET /api/manga?site_id[]=3&page=1&limit=30
+```
+
+- `limit` controls page size, but only within **`10..60` inclusive** — `9` or `61` both
+  return **422** (`"Поле limit должно быть между 10 и 60."`). Omitting `limit` defaults to
+  `60`, not some smaller number.
+- `page` must be `>= 1` — `0`/negative both 422 (`"Поле page должно быть не менее 1."`).
+- Response shape: `{"data": [...], "links": {...}, "meta": {...}}` — unlike every other
+  endpoint in this SDK, the top-level object isn't just `{"data": ...}`, callers need `meta`
+  too.
+- `meta.has_next_page` (bool) is exactly the "indicate whether more results exist" signal the
+  issue asked for — no need to compute it from a total count, and in fact **there is no total
+  count anywhere in the response** (no `meta.total`/`meta.last_page`). A page past the end
+  returns **200** with `"data": []` and `has_next_page: false`, not 404.
+- `meta.seed` is present on every response but turned out to be informational/unrelated to
+  requesting a specific page reliably — see "`sort_by=random`" below for the parameter that
+  actually matters for that.
+
+**Search — `q`:**
+
+`q=<text>` does a free-text search (matches on `name`/`rus_name`/`eng_name`, empirically).
+No separate "search" endpoint — same `GET /api/manga` as browsing, `q` is just another filter.
+
+**Genre filter — `genres[]`, AND semantics:**
+
+`genres[]=<id>` (repeatable) filters to titles having *all* given genre ids, not any of them
+— confirmed by combining a real genre id with a nonexistent one (`genres[]=34&genres[]=999999`
+→ 0 results, not the same non-zero count as `genres[]=34` alone; an OR filter would still have
+matched on the real id). Unknown genre ids don't error (no whitelist validation) — they just
+never match anything, so the SDK doesn't need to fetch/validate against a genre catalog at
+all, which is convenient because there isn't a public way to do that (see below).
+
+There's no confirmed way to list valid genre ids/names from this SDK's perspective: the
+obvious candidate endpoints (`GET /api/genres`, `GET /api/manga/genres`) both responded
+**403 `{"message": "User is not logged in."}`** — a different error shape than every other
+403 this SDK has seen (`AuthRequiredError`'s shape assumes the `/manga/...` family's JSON
+body), and not investigated further since it's not needed: `Catalog.list_titles(genres=...)`
+takes plain `int` ids, same as the issue's proposed shape, and callers already have to get
+genre ids from somewhere else (e.g. the site's own filter UI) regardless of what the SDK does.
+
+**Status filter — `status[]`, not `status`:**
+
+`status=1` (scalar) is **422** (`"Поле status должно быть массивом."` — must be an array),
+confirming the real param is `status[]=1`. Values are `Title.status.id`s — confirmed by
+requesting `status[]=1` and checking every returned item's `status.id == 1`. Observed ids in
+the wild: `1` ("В процессе"/ongoing), `2` ("Завершён"/completed), `4`, `5` (labels not fully
+sampled). Same as genres, an unrecognized id (`status[]=99`) is **422** here though (`"The
+selected status.0 is invalid."`) — unlike `genres[]`, this one *is* validated against a
+whitelist server-side, just not one this SDK has catalogued.
+
+**Sort — the real parameter is `sort_by`, not `sort` (`sort` is silently accepted and does
+nothing):**
+
+CLAUDE.md's original proposed shape (from the issue) guessed a `sort: str = "updated_at"`
+parameter. Checked directly: `sort=<anything>` (including garbage values) returns 200 with
+**no change in ordering whatsoever** compared to omitting it entirely — it isn't validated,
+isn't applied, just ignored. The parameter that actually controls ordering is **`sort_by`**,
+which *is* validated (unknown values → 422, no enumeration of allowed ones in the error body,
+so the set below was found by brute-forcing likely candidates, not read from a schema):
+
+| `sort_by` value | Result |
+|---|---|
+| `name` | 200, changes order |
+| `created_at` | 200, changes order |
+| `views` | 200, changes order |
+| `chap_count` | 200, changes order |
+| `last_chapter_at` | 200, changes order |
+| `rate_avg` | 200, changes order (confirmed by rating) |
+| `random` | 200, genuinely randomizes (different order every call, no shared seed by default) |
+| `updated_at`, `rating`, `alphabet`, `id`, `popularity`, ... | 422 invalid |
+
+This list isn't necessarily exhaustive — only what was tried. Also confirmed a companion
+**`sort_type`** parameter (`"desc"`/`"asc"`, default `desc`) that reverses ordering for
+whichever `sort_by` is active; `order`/`dir` were tried as alternate names for this and don't
+do anything (silently ignored, same as bare `sort`).
+
+Given `updated_at` doesn't exist, the SDK's default is **`last_chapter_at`** instead — the
+closest real equivalent to "recently updated" (a title's last-chapter timestamp, which is
+what actually changes when a title gets a new chapter). Same kind of correction as
+`number_secondary`/`team_id` earlier in this file: the issue's proposed shape was a starting
+guess, not verified API behavior.
+
+`sort_by=random` pagination note (not implemented, documented as a known gap): passing back
+the `random_order` float from a previous response's `meta.random_order` as a `random_order`
+query param on the next request keeps the random order stable across pages (confirmed:
+`page=1` and `page=2` with the same `random_order` value returned no overlapping ids).
+Without it, consecutive `sort_by=random` pages are independently randomized and can repeat or
+skip items. `Catalog.list_titles()` doesn't expose `sort_by="random"` pagination stability
+(no `random_order` parameter) — out of scope for this issue's ask (plain listing/search, not
+a "browse randomly without duplicates" feature); a caller can still pass `sort="random"` and
+get a valid, just not stably-paginated, response.
+
+**Catalog list items validate directly against the existing `Title` model:** a raw item from
+`GET /api/manga`'s `data` array has every field `Title` requires (`id`, `name`, `slug`,
+`slug_url`, `cover`, `ageRestriction`, `status`) and nothing that conflicts with it — confirmed
+by running `Title.model_validate()` on a real captured item. Fields `Title` defines with
+defaults but that this endpoint doesn't send (`genres`, `tags`, `authors`, `artists`, `teams`,
+`summary`, `release_date`, `chapter_count`, ...) just come back empty/`None`, same as any other
+optional field — no separate "catalog list item" model needed, matching the issue's explicit
+ask to reuse `Title`. Extra fields this endpoint sends that `Title` doesn't model (`rating`,
+`content_marking`, `type`, `site`, `releaseDateString`) are ignored by pydantic, same as
+everywhere else in the SDK.
+
 ## Open questions
 
 See the "Что НЕ проверено" section of `CLAUDE.md` for the current list: how a fractional
