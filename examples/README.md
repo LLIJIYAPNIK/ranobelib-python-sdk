@@ -24,6 +24,7 @@ mini-tutorial for the feature it demonstrates, not just copy-pasted.
 | [`09_disk_caching.py`](09_disk_caching.py) | disk cache + `refresh=True` |
 | [`10_export_formats.py`](10_export_formats.py) | `export()` to txt/fb2/epub/pdf |
 | [`11_error_handling.py`](11_error_handling.py) | `TitleNotFoundError` / `ChapterNotFoundError` |
+| [`12_catalog_listing.py`](12_catalog_listing.py) | `Catalog.list_titles()` — browsing/searching the catalog |
 
 See the [full API reference](https://LLIJIYAPNIK.github.io/ranobelib-python-sdk/reference/)
 for every public class/method, including `AuthRequiredError` and `RateLimitError`, which
