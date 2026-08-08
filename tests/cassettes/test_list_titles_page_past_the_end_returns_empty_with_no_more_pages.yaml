@@ -1,0 +1,66 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      host:
+      - api.cdnlibs.org
+      site-id:
+      - '3'
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/manga?site_id%5B%5D=3&page=99999&limit=10&sort_by=last_chapter_at&status%5B%5D=1
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAEA5WOwarCMBBF/2XWwTapYg2IH2JFRjNpi2kakihC6b+bSPG9pc5uhnvPmQkURgR5
+        PDEwvb0FkBPo3ocIEroYnWyKpkDXr67Kmv4SVqNv34emGNC2eHDY0p5DqmMu2bsxDJynx0+AXZo6
+        QSw9F8jMYKD82gTXu/dk4zmrQObojoH24/DRYey+1CWHI7+ggJdpj+Mf55+gw3DO7yxZjSYQg0Ck
+        kkpxjVSv9UUg34pyU2/UVihRVbrCkgsF8/wCuvjq31sBAAA=
+    headers:
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Sat, 08 Aug 2026 13:59:51 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=BaYWR7c8FfE1wejE; Domain=.cdnlibs.org; Path=/; Expires=Sat, 08-Aug-2026
+        14:19:51 GMT
+      - __ddg10_=1786197591; Domain=.cdnlibs.org; Path=/; Expires=Sat, 08-Aug-2026
+        14:19:51 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Sat, 08-Aug-2026
+        14:19:51 GMT
+      - __ddg1_=uYGOZYvPbvnhpb9FO0UM; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Sun,
+        08-Aug-2027 13:59:51 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '94'
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1
