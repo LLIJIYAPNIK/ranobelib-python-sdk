@@ -165,6 +165,78 @@ async def test_get_chapter_raises_auth_required_on_403() -> None:
             await client.get_chapter("1--example", number="1", volume="1")
 
 
+async def test_list_titles_sends_expected_query_params() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/manga"
+        assert request.url.params.get_list("site_id[]") == ["3"]
+        assert request.url.params["page"] == "1"
+        assert request.url.params["limit"] == "30"
+        assert request.url.params["sort_by"] == "last_chapter_at"
+        assert request.url.params["q"] == "dxd"
+        assert request.url.params.get_list("genres[]") == ["34", "35"]
+        assert request.url.params.get_list("status[]") == ["1"]
+        return httpx.Response(200, json={"data": [], "meta": {}})
+
+    async with _client(handler) as client:
+        await client.list_titles(
+            page=1,
+            per_page=30,
+            query="dxd",
+            genres=[34, 35],
+            status=1,
+            sort="last_chapter_at",
+        )
+
+
+async def test_list_titles_omits_optional_params_when_not_given() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert "q" not in request.url.params
+        assert "genres[]" not in request.url.params
+        assert "status[]" not in request.url.params
+        return httpx.Response(200, json={"data": [], "meta": {}})
+
+    async with _client(handler) as client:
+        await client.list_titles(
+            page=1, per_page=30, query=None, genres=None, status=None, sort="name"
+        )
+
+
+async def test_list_titles_returns_full_response_body() -> None:
+    payload = {"data": [{"id": 1}], "meta": {"current_page": 1, "has_next_page": True}}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=payload)
+
+    async with _client(handler) as client:
+        result = await client.list_titles(
+            page=1, per_page=30, query=None, genres=None, status=None, sort="name"
+        )
+
+    assert result == payload
+
+
+async def test_list_titles_raises_rate_limit_error_on_429() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, json={"data": {}})
+
+    async with _client(handler) as client:
+        with pytest.raises(RateLimitError):
+            await client.list_titles(
+                page=1, per_page=30, query=None, genres=None, status=None, sort="name"
+            )
+
+
+async def test_list_titles_wraps_validation_error_in_ranobelib_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(422, json={"data": {"sort_by": ["The selected sort_by is invalid."]}})
+
+    async with _client(handler) as client:
+        with pytest.raises(RanobeLibError):
+            await client.list_titles(
+                page=1, per_page=30, query=None, genres=None, status=None, sort="bogus"
+            )
+
+
 async def test_aclose_without_context_manager() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": {}})

@@ -1,5 +1,6 @@
 """Async Python SDK for ranobelib.me."""
 
+from ranobelib.catalog import Catalog
 from ranobelib.exceptions import (
     AmbiguousChapter,
     AuthRequiredError,
@@ -11,13 +12,15 @@ from ranobelib.exceptions import (
     TitleNotFoundError,
     VolumeNotFoundError,
 )
-from ranobelib.models import Chapter, ChapterBranch, Title, Volume
+from ranobelib.models import CatalogPage, Chapter, ChapterBranch, Title, Volume
 from ranobelib.sdk import RanobeLib
 from ranobelib.sizing import chapter_size, volume_size
 
 __all__ = [
     "AmbiguousChapter",
     "AuthRequiredError",
+    "Catalog",
+    "CatalogPage",
     "Chapter",
     "ChapterBranch",
     "ChapterNotFoundError",

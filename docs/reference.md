@@ -4,7 +4,11 @@
 
 ::: ranobelib.RanobeLib
 
+::: ranobelib.Catalog
+
 ## Models
+
+::: ranobelib.CatalogPage
 
 ::: ranobelib.Title
 

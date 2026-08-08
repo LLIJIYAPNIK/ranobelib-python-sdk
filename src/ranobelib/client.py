@@ -163,6 +163,60 @@ class ApiClient:
         data: dict[str, Any] = response.json()["data"]
         return data
 
+    async def list_titles(
+        self,
+        *,
+        page: int,
+        per_page: int,
+        query: str | None,
+        genres: list[int] | None,
+        status: int | None,
+        sort: str,
+    ) -> dict[str, Any]:
+        """Fetch one page of the catalog listing/search results.
+
+        Unlike the other ``ApiClient`` methods, this returns the *whole* response body, not
+        just ``data`` — callers need ``meta.has_next_page`` too, and there's no total count
+        to derive it from otherwise (see docs/api-notes.md).
+
+        Args:
+            page: 1-based page number.
+            per_page: Page size. The API only accepts ``10..60`` (validated by the caller,
+                see ``Catalog.list_titles``); values outside that raise here via a 422.
+            query: Free-text search term, matched against name/rus_name/eng_name. ``None``
+                or empty omits the ``q`` parameter entirely.
+            genres: Genre ids to filter by. A title must have *all* of them (AND, not OR —
+                see docs/api-notes.md), not just any one.
+            status: A single ``Title.status.id`` to filter by.
+            sort: Forwarded as the API's ``sort_by`` parameter, not ``sort`` — the API
+                silently ignores an actual ``sort`` parameter (see docs/api-notes.md); this
+                mismatch between the SDK's public keyword and the wire parameter name is
+                deliberate, not a typo.
+
+        Returns:
+            The full JSON response: ``{"data": [...], "meta": {...}, "links": {...}}``.
+        """
+        params: list[tuple[str, str | int | float | bool | None]] = [
+            ("site_id[]", RANOBELIB_SITE_ID),
+            ("page", str(page)),
+            ("limit", str(per_page)),
+            ("sort_by", sort),
+        ]
+        if query:
+            params.append(("q", query))
+        for genre_id in genres or []:
+            params.append(("genres[]", str(genre_id)))
+        if status is not None:
+            params.append(("status[]", str(status)))
+
+        response = await self._get("/manga", params=httpx.QueryParams(params))
+        self._raise_for_status(
+            response,
+            not_found=RanobeLibError(f"Unexpected 404 from catalog listing (page={page})"),
+        )
+        result: dict[str, Any] = response.json()
+        return result
+
     async def _get(self, url: str, *, params: Any = None) -> httpx.Response:
         """Issue a GET request, bounded by concurrency/pacing and retried on 429/5xx."""
         attempt = 0

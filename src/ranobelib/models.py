@@ -329,3 +329,16 @@ class Volume(BaseModel):
 
     number: str
     chapters: list[Chapter] = Field(default_factory=list)
+
+
+class CatalogPage(BaseModel):
+    """One page of catalog listing/search results, as returned by ``Catalog.list_titles()``.
+
+    ``items`` reuses ``Title`` as-is — a catalog list item has every field ``Title`` requires,
+    the ones it doesn't send (``genres``, ``summary``, ``chapter_count``, ...) just come back
+    at their defaults, same as any other partially-populated ``Title`` (see docs/api-notes.md).
+    """
+
+    items: list[Title]
+    page: int
+    has_next_page: bool
