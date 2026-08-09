@@ -8,6 +8,7 @@ import pytest
 from rich.console import Console
 
 from ranobelib.console import Reporter
+from ranobelib.exceptions import DownloadTitleInterruptedError, RateLimitError
 from ranobelib.exporters import EXPORTERS
 from ranobelib.models import Chapter, Title
 from ranobelib.sdk import RanobeLib, _group_into_volumes, _resolve_bulk_branch_id
@@ -321,6 +322,142 @@ async def test_download_title_full_mode_logs_cache_and_api_fetches(
 
     output = buffer.getvalue()
     assert "[cache] chapter 1/0" in output
+
+
+async def test_download_title_retries_past_a_rate_limit_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_chapters = [_raw_toc_chapter("1", str(index)) for index in range(3)]
+    sleeps: list[float] = []
+    attempts_for_chapter_1 = 0
+
+    async def fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    async def fake_get_chapters(*, refresh: bool = False) -> list[dict[str, Any]]:
+        return raw_chapters
+
+    async def fake_fetch_chapter(
+        volume_str: str, number: str, branch_id: int | None, *, refresh: bool = False
+    ) -> Chapter:
+        nonlocal attempts_for_chapter_1
+        if number == "1":
+            attempts_for_chapter_1 += 1
+            if attempts_for_chapter_1 == 1:
+                raise RateLimitError(retry_after=45.0)
+        return _fake_content_chapter(volume_str, number, branch_id)
+
+    monkeypatch.setattr("ranobelib.sdk.asyncio.sleep", fake_sleep)
+
+    async with RanobeLib("1--slug") as lib:
+        monkeypatch.setattr(lib, "_get_chapters", fake_get_chapters)
+        monkeypatch.setattr(lib, "_fetch_chapter", fake_fetch_chapter)
+
+        volumes = await lib.download_title()
+
+    # Retried once, honoring Retry-After, then kept going without losing later chapters.
+    assert sleeps == [45.0]
+    assert [chapter.number for chapter in volumes[0].chapters] == ["0", "1", "2"]
+
+
+async def test_download_title_backs_off_without_retry_after(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_chapters = [_raw_toc_chapter("1", "0")]
+    sleeps: list[float] = []
+    attempts = 0
+
+    async def fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    async def fake_get_chapters(*, refresh: bool = False) -> list[dict[str, Any]]:
+        return raw_chapters
+
+    async def fake_fetch_chapter(
+        volume_str: str, number: str, branch_id: int | None, *, refresh: bool = False
+    ) -> Chapter:
+        nonlocal attempts
+        attempts += 1
+        if attempts <= 2:
+            raise RateLimitError()
+        return _fake_content_chapter(volume_str, number, branch_id)
+
+    monkeypatch.setattr("ranobelib.sdk.asyncio.sleep", fake_sleep)
+
+    async with RanobeLib("1--slug") as lib:
+        monkeypatch.setattr(lib, "_get_chapters", fake_get_chapters)
+        monkeypatch.setattr(lib, "_fetch_chapter", fake_fetch_chapter)
+
+        await lib.download_title()
+
+    # No Retry-After header on either 429 -> capped exponential backoff, doubling per attempt.
+    assert sleeps == [5.0, 10.0]
+
+
+async def test_download_title_raises_interrupted_error_with_partial_progress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_chapters = [_raw_toc_chapter("1", str(index)) for index in range(3)]
+
+    async def fake_sleep(delay: float) -> None:
+        return None
+
+    async def fake_get_chapters(*, refresh: bool = False) -> list[dict[str, Any]]:
+        return raw_chapters
+
+    async def fake_fetch_chapter(
+        volume_str: str, number: str, branch_id: int | None, *, refresh: bool = False
+    ) -> Chapter:
+        if number == "1":
+            raise RateLimitError()
+        return _fake_content_chapter(volume_str, number, branch_id)
+
+    monkeypatch.setattr("ranobelib.sdk.asyncio.sleep", fake_sleep)
+
+    async with RanobeLib("1--slug") as lib:
+        monkeypatch.setattr(lib, "_get_chapters", fake_get_chapters)
+        monkeypatch.setattr(lib, "_fetch_chapter", fake_fetch_chapter)
+
+        with pytest.raises(DownloadTitleInterruptedError) as exc_info:
+            await lib.download_title(max_rate_limit_retries=2)
+
+    error = exc_info.value
+    # Chapter "0" was already fetched before chapter "1" started failing for good.
+    assert error.slug_url == "1--slug"
+    assert error.completed == 1
+    assert error.total == 3
+    assert [chapter.number for chapter in error.volumes[0].chapters] == ["0"]
+    assert isinstance(error.__cause__, RateLimitError)
+
+
+async def test_download_title_max_rate_limit_retries_zero_disables_extra_retrying(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_chapters = [_raw_toc_chapter("1", "0")]
+    sleeps: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    async def fake_get_chapters(*, refresh: bool = False) -> list[dict[str, Any]]:
+        return raw_chapters
+
+    async def fake_fetch_chapter(
+        volume_str: str, number: str, branch_id: int | None, *, refresh: bool = False
+    ) -> Chapter:
+        raise RateLimitError()
+
+    monkeypatch.setattr("ranobelib.sdk.asyncio.sleep", fake_sleep)
+
+    async with RanobeLib("1--slug") as lib:
+        monkeypatch.setattr(lib, "_get_chapters", fake_get_chapters)
+        monkeypatch.setattr(lib, "_fetch_chapter", fake_fetch_chapter)
+
+        with pytest.raises(DownloadTitleInterruptedError) as exc_info:
+            await lib.download_title(max_rate_limit_retries=0)
+
+    assert sleeps == []
+    assert exc_info.value.completed == 0
 
 
 async def test_export_wires_on_chapter_to_progress_bar(

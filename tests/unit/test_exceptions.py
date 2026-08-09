@@ -4,6 +4,7 @@ from ranobelib.exceptions import (
     AmbiguousChapter,
     AuthRequiredError,
     ChapterNotFoundError,
+    DownloadTitleInterruptedError,
     MultipleTitleTranslationsError,
     MultipleTranslationsError,
     RanobeLibError,
@@ -11,7 +12,8 @@ from ranobelib.exceptions import (
     TitleNotFoundError,
     VolumeNotFoundError,
 )
-from ranobelib.models import ChapterBranch, ChapterUser, Team
+from ranobelib.models import Chapter, ChapterBranch, ChapterUser, Team
+from ranobelib.sdk import _group_into_volumes
 
 
 def test_title_not_found_error_carries_slug_url() -> None:
@@ -121,3 +123,25 @@ def test_multiple_title_translations_error_lists_every_ambiguous_chapter() -> No
     assert "volume='1' number='1'" in message
     assert "branch_id=2251 (BerkuD13)" in message
     assert "branch_id=635 (ItsEND)" in message
+
+
+def test_download_title_interrupted_error_carries_partial_progress_and_cause() -> None:
+    chapter = Chapter.model_validate(
+        {"id": 1, "volume": "1", "number": "1", "name": "One", "content": "<p>Hi.</p>"}
+    )
+    volumes = _group_into_volumes([chapter])
+    cause = RateLimitError(retry_after=30.0)
+
+    try:
+        raise DownloadTitleInterruptedError(
+            "6712--example", volumes=volumes, completed=1, total=5
+        ) from cause
+    except DownloadTitleInterruptedError as error:
+        assert isinstance(error, RanobeLibError)
+        assert error.slug_url == "6712--example"
+        assert error.volumes == volumes
+        assert error.completed == 1
+        assert error.total == 5
+        assert error.__cause__ is cause
+        assert "6712--example" in str(error)
+        assert "1/5" in str(error)

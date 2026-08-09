@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
-    from ranobelib.models import ChapterBranch
+    from ranobelib.models import ChapterBranch, Volume
 
 
 class RanobeLibError(Exception):
@@ -164,3 +164,36 @@ class RateLimitError(RanobeLibError):
         self.retry_after = retry_after
         suffix = f" (retry after {retry_after}s)" if retry_after is not None else ""
         super().__init__(f"Rate limited by the API{suffix}")
+
+
+class DownloadTitleInterruptedError(RanobeLibError):
+    """Raised by ``download_title()`` when a chapter fetch fails unrecoverably partway through.
+
+    ``download_title()`` fetches hundreds-to-thousands of chapters sequentially for a long
+    title, which can outlast even the extra, bulk-specific rate-limit retry budget described
+    in ``download_title()``'s ``max_rate_limit_retries`` — or hit some other unrecoverable
+    error (e.g. ``AuthRequiredError`` on a chapter that turns out to need a paywall/auth
+    token). Rather than letting that error propagate on its own and silently discard every
+    chapter already fetched, it's wrapped in this exception instead, carrying what was
+    already downloaded — so a caller can keep that partial result, or simply call
+    ``download_title()`` again: the SDK's disk cache means already-fetched chapters aren't
+    re-requested, so a retry resumes close to where this one stopped rather than restarting
+    the whole title. See docs/api-notes.md's "Rate limiting и retry" section and issue #41.
+
+    Attributes:
+        slug_url: The title's ``{id}--{slug}`` identifier.
+        volumes: Chapters fetched before the failure, grouped into volumes the same way a
+            successful ``download_title()`` call would return them.
+        completed: How many chapters were fetched before the failure.
+        total: How many chapters ``download_title()`` had planned to fetch in total.
+    """
+
+    def __init__(self, slug_url: str, *, volumes: list[Volume], completed: int, total: int) -> None:
+        self.slug_url = slug_url
+        self.volumes = volumes
+        self.completed = completed
+        self.total = total
+        super().__init__(
+            f"download_title() for {slug_url!r} was interrupted after {completed}/{total} "
+            "chapter(s) fetched — see __cause__ for why, .volumes for what was already fetched."
+        )
