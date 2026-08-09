@@ -14,14 +14,27 @@ from ranobelib.console import Reporter, Verbosity
 from ranobelib.exceptions import (
     AmbiguousChapter,
     ChapterNotFoundError,
+    DownloadTitleInterruptedError,
     MultipleTitleTranslationsError,
     MultipleTranslationsError,
+    RanobeLibError,
+    RateLimitError,
     VolumeNotFoundError,
 )
 from ranobelib.exporters import EXPORTERS
 from ranobelib.models import Chapter, ChapterBranch, Title, Volume
 from ranobelib.numbering import parse_slug_url
 from ranobelib.sizing import DEFAULT_AVERAGE_IMAGE_SIZE, DEFAULT_SAMPLE_SIZE, chapter_size
+
+DEFAULT_RATE_LIMIT_RETRIES = 6
+"""Default ``download_title(max_rate_limit_retries=...)`` — see docs/api-notes.md."""
+
+_RATE_LIMIT_RETRY_BASE_DELAY = 5.0
+"""Base delay, in seconds, for download_title()'s bulk rate-limit backoff (doubled per
+attempt, capped at _RATE_LIMIT_RETRY_MAX_DELAY) — used when the API's 429 doesn't send a
+Retry-After header."""
+
+_RATE_LIMIT_RETRY_MAX_DELAY = 60.0
 
 _INFO_FIELDS = [
     "background",
@@ -235,6 +248,7 @@ class RanobeLib:
         translation_index: int | None = None,
         chapter_delay: float = 0.0,
         on_chapter: Callable[[int, int], None] | None = None,
+        max_rate_limit_retries: int = DEFAULT_RATE_LIMIT_RETRIES,
     ) -> list[Volume]:
         """Download every chapter of the title, across all its volumes.
 
@@ -247,6 +261,14 @@ class RanobeLib:
         raises ``MultipleTitleTranslationsError`` listing *all* of them at once (unless
         ``branch_id`` or ``translation_index`` resolves every one of them), rather than
         failing partway through a long download on the first ambiguous chapter.
+
+        A long title's sequential download can outlast ``ApiClient``'s own retry budget for
+        429s (tuned for a single one-off request, not hundreds/thousands of sequential
+        fetches — see docs/api-notes.md). On top of that, each chapter fetch that still comes
+        back rate-limited is retried again here, up to ``max_rate_limit_retries`` times, with
+        its own (coarser) backoff. If a chapter fetch still fails after that — from rate
+        limiting or anything else — the chapters already downloaded are not discarded: they're
+        attached to a raised ``DownloadTitleInterruptedError`` instead of being lost.
 
         Args:
             branch_id: Translation to use for every chapter that has more than one — same
@@ -266,11 +288,20 @@ class RanobeLib:
                 who would otherwise have no way to observe anything before this whole
                 ``await`` returns. Independent of ``verbosity``: both can be set at once,
                 each drives its own output.
+            max_rate_limit_retries: How many extra times to retry a single chapter fetch that
+                comes back rate-limited, on top of ``ApiClient``'s own retries, before giving
+                up on the whole download — see above. Each retry honors the API's
+                ``Retry-After`` if it sent one, otherwise waits with its own capped
+                exponential backoff. Set to ``0`` to disable this extra layer and let a
+                persistent ``RateLimitError`` end the download immediately (still wrapped in
+                ``DownloadTitleInterruptedError`` with whatever was already fetched).
 
         Raises:
             ValueError: If both ``branch_id`` and ``translation_index`` are given.
             MultipleTitleTranslationsError: If the title has one or more chapters with more
                 than one translation that ``branch_id``/``translation_index`` didn't resolve.
+            DownloadTitleInterruptedError: If fetching a chapter fails unrecoverably partway
+                through the download — carries every chapter already fetched.
         """
         if branch_id is not None and translation_index is not None:
             raise ValueError("Pass at most one of branch_id or translation_index, not both.")
@@ -304,16 +335,31 @@ class RanobeLib:
         if unresolved:
             raise MultipleTitleTranslationsError(self._slug_url, chapters=unresolved)
 
-        chapters = []
+        chapters: list[Chapter] = []
         total = len(planned)
-        with self._reporter.progress(f"Downloading {self._slug_url}", total) as advance:
-            for index, (volume_str, number, selected_branch_id) in enumerate(planned):
-                chapters.append(await self._fetch_chapter(volume_str, number, selected_branch_id))
-                advance()
-                if on_chapter is not None:
-                    on_chapter(index + 1, total)
-                if chapter_delay and index < total - 1:
-                    await asyncio.sleep(chapter_delay)
+        try:
+            with self._reporter.progress(f"Downloading {self._slug_url}", total) as advance:
+                for index, (volume_str, number, selected_branch_id) in enumerate(planned):
+                    chapters.append(
+                        await self._fetch_chapter_riding_out_rate_limits(
+                            volume_str,
+                            number,
+                            selected_branch_id,
+                            max_rate_limit_retries=max_rate_limit_retries,
+                        )
+                    )
+                    advance()
+                    if on_chapter is not None:
+                        on_chapter(index + 1, total)
+                    if chapter_delay and index < total - 1:
+                        await asyncio.sleep(chapter_delay)
+        except RanobeLibError as exc:
+            raise DownloadTitleInterruptedError(
+                self._slug_url,
+                volumes=_group_into_volumes(chapters),
+                completed=len(chapters),
+                total=total,
+            ) from exc
         return _group_into_volumes(chapters)
 
     async def estimate_title_size(
@@ -475,6 +521,44 @@ class RanobeLib:
         )
         self._cache.set(key, data)
         return Chapter.model_validate(data)
+
+    async def _fetch_chapter_riding_out_rate_limits(
+        self,
+        volume_str: str,
+        number: str,
+        branch_id: int | None,
+        *,
+        max_rate_limit_retries: int,
+    ) -> Chapter:
+        """Fetch one chapter for a bulk download, retrying past ``ApiClient``'s own budget.
+
+        ``ApiClient._get()`` already retries a 429 a few times with its own backoff, tuned
+        for a single request (see docs/api-notes.md) — not enough to ride out sustained rate
+        limiting partway through a long sequential download. This adds a second, coarser
+        retry layer on top: on a ``RateLimitError`` that already survived ``ApiClient``'s own
+        retries, wait (honoring ``Retry-After`` if given, otherwise capped exponential
+        backoff) and try again, up to ``max_rate_limit_retries`` times, before finally letting
+        the error propagate to the caller (``download_title()``, which turns it into
+        ``DownloadTitleInterruptedError`` carrying whatever was already downloaded).
+        """
+        attempt = 0
+        while True:
+            try:
+                return await self._fetch_chapter(volume_str, number, branch_id)
+            except RateLimitError as exc:
+                if attempt >= max_rate_limit_retries:
+                    raise
+                delay = exc.retry_after
+                if delay is None:
+                    delay = min(
+                        _RATE_LIMIT_RETRY_BASE_DELAY * (2**attempt), _RATE_LIMIT_RETRY_MAX_DELAY
+                    )
+                self._reporter.log(
+                    f"[rate-limit] chapter {volume_str}/{number}: retrying in {delay:g}s "
+                    f"(attempt {attempt + 1}/{max_rate_limit_retries})"
+                )
+                await asyncio.sleep(delay)
+                attempt += 1
 
     def _resolve_branch_id(
         self, volume_str: str, number: str, raw_chapters: list[dict[str, Any]]

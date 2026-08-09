@@ -289,6 +289,61 @@ per-instance, а без этого тесты вроде `get_volume()` на р�
 реально ждали бы ~10 секунд ради поведения, которое `test_client.py` и так проверяет точно
 и без ожидания через инъекцию fake `sleep`/`clock`.
 
+#### `download_title()` outliving `ApiClient`'s per-request retry budget (issue #41)
+
+Reported against a real 3932-chapter title (`17435--fan-ren-xiu-xian-chuan`): sustained
+sequential fetching by `download_title()` reliably trips the API's own 429 around chapter
+~217, well before `ApiClient`'s retry budget was ever meant to cover — `max_retries=3`/
+`retry_base_delay=1.0s` (~1s/2s/4s, ~7s total) is tuned for one request tolerating a
+transient blip, not a download that's already been running for tens of seconds to minutes.
+Once that budget is exhausted, the `RateLimitError` used to propagate straight out of
+`download_title()`, discarding every chapter fetched so far — they only ever lived in a
+local list, never returned to the caller on failure.
+
+**Fix, two parts, both in `sdk.py` (not `ApiClient` — this is a bulk-operation-specific
+concern layered on top, not a change to the per-request retry policy every other method
+also relies on):**
+
+1. `RanobeLib._fetch_chapter_riding_out_rate_limits()` wraps `_fetch_chapter()` for
+   `download_title()`'s loop: on a `RateLimitError` that already survived `ApiClient`'s own
+   retries, wait and try again — honoring `Retry-After` if the API sent one, otherwise capped
+   exponential backoff (`_RATE_LIMIT_RETRY_BASE_DELAY=5.0s`, doubling, capped at
+   `_RATE_LIMIT_RETRY_MAX_DELAY=60.0s`) — up to a new `max_rate_limit_retries` parameter on
+   `download_title()` (default `DEFAULT_RATE_LIMIT_RETRIES=6`; `0` disables this extra layer
+   entirely). These numbers are a judgment call, not measured against the live API's actual
+   rate-limit window (undocumented, see the rest of this file's running theme) — generous
+   enough to ride out a temporary throttling window without an unbounded/indefinite retry
+   loop that could hang forever on a title the API has decided to block outright.
+2. If a chapter fetch still fails after that (rate limiting past the ceiling above, or any
+   other `RanobeLibError` — e.g. a chapter unexpectedly requiring auth mid-download), the
+   chapters already fetched are no longer thrown away: `download_title()` catches it and
+   raises `DownloadTitleInterruptedError` instead, carrying `.volumes` (what was already
+   downloaded, grouped exactly like a successful return), `.completed`, `.total`, and the
+   original error as `__cause__`. A caller can keep the partial result, or just call
+   `download_title()` again — the disk cache (see "Кэширование" in CLAUDE.md) means
+   already-fetched chapters aren't re-requested, so a retry resumes rather than restarts.
+   This is the same pattern `ranobelib-companion` was already doing *outside* the SDK as a
+   workaround (catch `RateLimitError`, back off, call `download_title()` again, rely on the
+   cache) — issue #41 asked for it to move inside the SDK so every caller gets it for free,
+   not just that one.
+
+Not extended to `get_chapters()`/`get_volume()`/`get_volumes()`/`estimate_title_size()` in
+this fix — the reported failure and this issue's reproduction are specifically about
+`download_title()` (the one bulk method whose whole point is walking *every* chapter of a
+long title sequentially in one call, so it's the one that actually reaches the chapter
+counts where this bites); the other bulk methods take an explicit, caller-provided list of
+chapters/volumes to fetch, which for the same underlying reason (this is a "how many
+requests can this one call make in a row" problem) rarely gets anywhere near that many in
+practice. Same retry-layer/partial-progress mechanism if one of them turns out to need it —
+left as a follow-up, not guessed at speculatively here.
+
+Unit-tested in `tests/unit/test_sdk.py` (`test_download_title_*rate_limit*`,
+`test_download_title_raises_interrupted_error_with_partial_progress`) via the same
+`monkeypatch(lib, "_fetch_chapter", ...)` pattern `estimate_title_size()`'s tests already
+use, not VCR — same reasoning as `ApiClient`'s own retry tests above: no existing cassette
+reproduces sustained 429s, and a fake `_fetch_chapter` exercises the retry/give-up logic
+exactly without needing one.
+
 ### PDF export: WeasyPrint needs native libraries at *import* time, not just install time
 
 Discovered while implementing the pdf exporter (roadmap step 15), on this repo's Windows
