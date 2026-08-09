@@ -21,6 +21,15 @@ help to a caller that isn't a terminal at all — e.g. a web backend running dow
 in a background job, which needs to report "chapter N of M" to a browser through its own
 polling/SSE status endpoint instead. Both can be used together; `on_chapter` doesn't replace
 `verbosity`.
+
+A long title (hundreds-to-thousands of chapters) can trip the API's own rate limiting partway
+through, even with pacing/retries already applied per request — download_title() retries a
+rate-limited chapter fetch further still (`max_rate_limit_retries`, on top of the client's own
+retry budget), and if it still can't get past it (or hits any other unrecoverable error), it
+raises DownloadTitleInterruptedError instead of silently discarding everything already
+downloaded: catch it, and `.volumes`/`.completed`/`.total` tell you exactly how far it got.
+Calling download_title() again afterward resumes rather than restarts, since already-fetched
+chapters are served from the disk cache. See docs/api-notes.md ("issue #41") for details.
 """
 
 import asyncio

@@ -30,6 +30,8 @@
 
 ::: ranobelib.RateLimitError
 
+::: ranobelib.DownloadTitleInterruptedError
+
 ## Sizing
 
 ::: ranobelib.chapter_size
