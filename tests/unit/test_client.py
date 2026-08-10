@@ -237,6 +237,37 @@ async def test_list_titles_wraps_validation_error_in_ranobelib_error() -> None:
             )
 
 
+async def test_list_genres_sends_expected_query_params() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/constants"
+        assert request.url.params.get_list("fields[]") == ["genres"]
+        return httpx.Response(200, json={"data": {"genres": []}})
+
+    async with _client(handler) as client:
+        await client.list_genres()
+
+
+async def test_list_genres_returns_raw_genres_array() -> None:
+    genres = [{"id": 34, "name": "Боевик", "adult": False, "site_ids": [1, 2, 3, 4, 5]}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": {"genres": genres}})
+
+    async with _client(handler) as client:
+        result = await client.list_genres()
+
+    assert result == genres
+
+
+async def test_list_genres_raises_rate_limit_error_on_429() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, json={"data": {}})
+
+    async with _client(handler) as client:
+        with pytest.raises(RateLimitError):
+            await client.list_genres()
+
+
 async def test_aclose_without_context_manager() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": {}})

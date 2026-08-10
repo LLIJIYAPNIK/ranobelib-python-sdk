@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from ranobelib import Catalog, CatalogPage, Title
+from ranobelib import Catalog, CatalogPage, Genre, Title
 
 
 @pytest.mark.vcr
@@ -96,3 +96,48 @@ async def test_list_titles_rejects_per_page_out_of_range(per_page: int) -> None:
     async with Catalog() as catalog:
         with pytest.raises(ValueError, match="per_page"):
             await catalog.list_titles(per_page=per_page)
+
+
+@pytest.mark.vcr
+async def test_list_genres_returns_genres_with_id_and_name() -> None:
+    async with Catalog() as catalog:
+        genres = await catalog.list_genres()
+
+    assert genres
+    assert all(isinstance(genre, Genre) for genre in genres)
+    assert all(genre.id and genre.name for genre in genres)
+    # Genre 34 is used elsewhere in this test suite as a `list_titles(genres=[34])` filter
+    # value (see test_list_titles_filters_by_genres_and_status_combined) — confirm it
+    # resolves to a real name here.
+    assert any(genre.id == 34 and genre.name == "Боевик" for genre in genres)
+
+
+@pytest.mark.vcr
+async def test_list_genres_excludes_genres_not_tagged_for_ranobelib() -> None:
+    async with Catalog() as catalog:
+        genres = await catalog.list_genres()
+
+    # Genre 88 ("Детское") is tagged site_ids: [5] only in the raw API response (see
+    # docs/api-notes.md) — ranobelib.me is site 3, so it must be filtered out.
+    assert all(genre.id != 88 for genre in genres)
+
+
+@pytest.mark.vcr
+async def test_list_genres_second_call_same_params_is_served_from_cache(
+    tmp_path: Path, vcr: object
+) -> None:
+    async with Catalog(cache_dir=tmp_path) as catalog:
+        first = await catalog.list_genres()
+        second = await catalog.list_genres()
+
+    assert first == second
+    assert len(vcr.requests) == 1  # type: ignore[attr-defined]
+
+
+@pytest.mark.vcr
+async def test_list_genres_refresh_bypasses_cache(tmp_path: Path, vcr: object) -> None:
+    async with Catalog(cache_dir=tmp_path) as catalog:
+        await catalog.list_genres()
+        await catalog.list_genres(refresh=True)
+
+    assert len(vcr.requests) == 2  # type: ignore[attr-defined]

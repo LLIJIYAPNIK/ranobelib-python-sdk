@@ -1,7 +1,7 @@
 """Unit tests for ranobelib.catalog helpers (no network)."""
 
-from ranobelib.catalog import _build_page, _cache_key
-from ranobelib.models import CatalogPage, Title
+from ranobelib.catalog import _build_genres, _build_page, _cache_key
+from ranobelib.models import CatalogPage, Genre, Title
 
 _TITLE_ITEM = {
     "id": 1,
@@ -64,3 +64,26 @@ def test_cache_key_stable_for_equivalent_calls() -> None:
     key2 = _cache_key(page=1, per_page=30, query="dxd", genres=[1, 2], status=1, sort="name")
 
     assert key1 == key2
+
+
+def test_build_genres_validates_items_as_genre() -> None:
+    data = [{"id": 34, "name": "Боевик", "adult": False, "site_ids": [1, 2, 3, 4, 5]}]
+
+    genres = _build_genres(data)
+
+    assert genres == [Genre(id=34, name="Боевик", adult=False)]
+
+
+def test_build_genres_drops_genres_not_tagged_for_ranobelib() -> None:
+    data = [
+        {"id": 34, "name": "Боевик", "adult": False, "site_ids": [1, 2, 3, 4, 5]},
+        {"id": 88, "name": "Детское", "adult": False, "site_ids": [5]},
+    ]
+
+    genres = _build_genres(data)
+
+    assert [genre.id for genre in genres] == [34]
+
+
+def test_build_genres_handles_empty_results() -> None:
+    assert _build_genres([]) == []
