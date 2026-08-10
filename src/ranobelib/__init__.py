@@ -13,7 +13,7 @@ from ranobelib.exceptions import (
     TitleNotFoundError,
     VolumeNotFoundError,
 )
-from ranobelib.models import CatalogPage, Chapter, ChapterBranch, Title, Volume
+from ranobelib.models import CatalogPage, Chapter, ChapterBranch, Genre, Title, Volume
 from ranobelib.sdk import RanobeLib
 from ranobelib.sizing import chapter_size, volume_size
 
@@ -26,6 +26,7 @@ __all__ = [
     "ChapterBranch",
     "ChapterNotFoundError",
     "DownloadTitleInterruptedError",
+    "Genre",
     "MultipleTitleTranslationsError",
     "MultipleTranslationsError",
     "RanobeLib",

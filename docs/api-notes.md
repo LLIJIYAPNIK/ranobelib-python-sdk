@@ -422,13 +422,55 @@ matched on the real id). Unknown genre ids don't error (no whitelist validation)
 never match anything, so the SDK doesn't need to fetch/validate against a genre catalog at
 all, which is convenient because there isn't a public way to do that (see below).
 
-There's no confirmed way to list valid genre ids/names from this SDK's perspective: the
-obvious candidate endpoints (`GET /api/genres`, `GET /api/manga/genres`) both responded
-**403 `{"message": "User is not logged in."}`** — a different error shape than every other
-403 this SDK has seen (`AuthRequiredError`'s shape assumes the `/manga/...` family's JSON
-body), and not investigated further since it's not needed: `Catalog.list_titles(genres=...)`
-takes plain `int` ids, same as the issue's proposed shape, and callers already have to get
-genre ids from somewhere else (e.g. the site's own filter UI) regardless of what the SDK does.
+There's no way to list genre ids/names via `GET /api/genres` or `GET /api/manga/genres` —
+both respond **403 `{"message": "User is not logged in."}`**, a different error shape than
+every other 403 this SDK has seen (`AuthRequiredError`'s shape assumes the `/manga/...`
+family's JSON body). A working, unauthenticated endpoint was found (issue #44):
+
+```
+GET /api/constants?fields[]=genres
+```
+
+`Accept: application/json` still required (same as everywhere else — no `Site-Id`
+requirement here though, see below), no auth needed, 200 with
+`{"data": {"genres": [...]}}`. Each element:
+
+```json
+{
+  "id": 34,
+  "name": "Боевик",
+  "alt_name": [],
+  "dsc": "",
+  "adult": false,
+  "alert": false,
+  "site_ids": [1, 2, 3, 4, 5],
+  "blocked_for_country": [],
+  "allowed_for_country": [],
+  "allowed_for_domain": [],
+  "anilist_id": null,
+  "shiki_id": null,
+  "mal_id": null,
+  "is_media_spoiler": null,
+  "is_general_spoiler": null
+}
+```
+
+55 genres total as of this writing. `id`/`name`/`adult` map directly onto the existing
+`Genre` model (`Title.genres`'s element type, reused per the issue's ask — no separate
+"catalog genre" model). **`site_ids` isn't site-scoped by any request parameter** — a
+`Site-Id: 3` header (or omitting it) makes no difference to which genres come back, unlike
+every other endpoint that header matters for; the response always contains genres for the
+whole lib.social network at once, and callers must filter by `site_ids` themselves.
+54 of the 55 genres include `3` (ranobelib.me) in `site_ids`; the one exception is id `88`
+("Детское"), tagged `site_ids: [5]` only. `Catalog.list_genres()` filters to `site_ids`
+containing `3` before returning, so a ranobelib-scoped caller never sees a genre that
+couldn't possibly match any ranobelib title — see `catalog.py`'s `_build_genres()`.
+
+`GET /api/constants` also exposes other `fields[]` values unrelated to this issue (found
+while probing, not otherwise used by this SDK): `tags`, `status`, `types`,
+`imageServers` — each 403-free the same way `genres` is. Not investigated further; noted
+here in case a future feature needs one of them (same "don't guess, check first" principle
+as this whole section).
 
 **Status filter — `status[]`, not `status`:**
 

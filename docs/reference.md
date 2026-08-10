@@ -18,6 +18,8 @@
 
 ::: ranobelib.ChapterBranch
 
+::: ranobelib.Genre
+
 ## Exceptions
 
 ::: ranobelib.RanobeLibError

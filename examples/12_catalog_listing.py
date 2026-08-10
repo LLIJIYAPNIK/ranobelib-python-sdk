@@ -1,4 +1,4 @@
-"""List/search the ranobelib.me catalog with Catalog.list_titles().
+"""List/search the ranobelib.me catalog with Catalog.list_titles()/Catalog.list_genres().
 
 Catalog is a separate entry point from RanobeLib: browsing/searching the whole site isn't
 scoped to any one title, so it doesn't belong on the class that's built around a title's URL.
@@ -24,11 +24,23 @@ async def main() -> None:
         for title in page.items[:5]:
             print(f"  {title.id}: {title.name} ({title.status.label})")
 
+        # `list_genres()` is the id -> name lookup for the `genres` filter below: it fetches
+        # every genre ranobelib.me actually uses (the underlying API endpoint covers the
+        # whole lib.social network at once, tagged by site — Catalog filters that down to
+        # ranobelib for you, see docs/api-notes.md), cached on disk like list_titles().
+        genres = await catalog.list_genres()
+        print(f"{len(genres)} genres available, e.g.: {[genre.name for genre in genres[:5]]}")
+        action_genre = next(genre for genre in genres if genre.name == "Боевик")
+
         # `genres`/`status` filter narrows results; `genres` is a list of ids because a
         # title can be filtered by more than one at once (it must have *all* of them, not
-        # just any one — see docs/api-notes.md). There's no public way to look up which id
-        # means which genre from this SDK, so ids have to come from elsewhere (e.g. the
-        # site's own filter UI) — the SDK just passes them through.
+        # just any one — see docs/api-notes.md). Ids come from list_genres() above, or from
+        # the site's own filter UI.
+        action_page = await catalog.list_titles(genres=[action_genre.id], per_page=10)
+        print(f"\n5 '{action_genre.name}' titles:")
+        for title in action_page.items[:5]:
+            print(f"  {title.id}: {title.name}")
+
         completed_page = await catalog.list_titles(status=2, per_page=10)
         print(f"\n{len(completed_page.items)} completed titles on page 1:")
         for title in completed_page.items[:5]:
@@ -43,8 +55,9 @@ async def main() -> None:
 
 asyncio.run(main())
 
-# Expected output (real run against the live site; new titles are added constantly, so the
-# exact ids/names here will drift over time — that's the site changing, not a bug):
+# Expected output (real run against the live site; new titles are added constantly and the
+# genre list can change too, so the exact ids/names here will drift over time — that's the
+# site changing, not a bug):
 #
 # page 1, has_next_page=True
 #   261856: DxD : A Nameless Star (Онгоинг)
@@ -52,14 +65,21 @@ asyncio.run(main())
 #   256087: DxD: Gambling With Fate (Онгоинг)
 #   257880: DxD : Draconic Rebellion (Онгоинг)
 #   248229: DxD: The Replication System! (Онгоинг)
+# 54 genres available, e.g.: ['Арт', 'Безумие', 'Боевик', 'Боевые искусства', 'Вампиры']
+#
+# 5 'Боевик' titles:
+#   270852: Heonteo Yeogo-ui Namseonsaeng
+#   69254: Legend of the Northern Blade (Novel)
+#   51849: Hoegwija sayongseolmyeongseo (Novel)
+#   267443: Dong Jing Kuang Jing
+#   89805: Na honja teugseongmuhan (Novel)
 #
 # 10 completed titles on page 1:
 #   270852: Heonteo Yeogo-ui Namseonsaeng
-#   237172: dakeu pantajisog seong-gisa
-#   199982: beulraekppaejo
-#   91050: soseol sog magnaehwangjaga doeeossda (Novel)
-#   37072: mungwalado an joesonghan isegyelo gam
+#   96586: zhè yóu xì yě tài zhēnshí liǎo
+#   219202: hoegwihan yongbyeong-eun da gyehoeg-i issda
+#   69254: Legend of the Northern Blade (Novel)
+#   271058: Kuàichuān gōnglüè: Yāoniè sùzhǔ, kāiguà le
 #
-# 5 newest titles: ['Проклятая песнь', 'Бремя Некро-Меча', 'The Enhanced Doctor', 'Я простой
-# смертный, который встретил в обыкновенном кафе раненого величайшего святого', 'Wings of
-# Reverie']
+# 5 newest titles: ['Segyesu yeohaengsa : Sgeub meogbangdaemoheom paekiji!', 'Guai Wu Bei Sha
+# Jiu Hui Si', 'Жестокая месть', 'Пока дым не рассеется', 'Плачущий демон и диванный политик']
