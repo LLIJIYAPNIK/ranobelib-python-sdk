@@ -9,6 +9,12 @@ project follows [Semantic Versioning](https://semver.org/). Entries are generate
 `main` whenever a GitHub Release is published — don't hand-edit released sections, fix the
 underlying commit message/PR title instead and let the next release regenerate this file.
 
+## [0.7.0] - 2026-08-10
+
+### Added
+
+- Add Catalog.list_genres()
+
 ## [0.6.1] - 2026-08-09
 
 ### Fixed
@@ -103,6 +109,7 @@ underlying commit message/PR title instead and let the next release regenerate t
 - Pin setup-uv to an existing tag
 - Make Exporter.export async
 
+[0.7.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.6.1..v0.7.0
 [0.6.1]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.6.0..v0.6.1
 [0.6.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.5.0..v0.6.0
 [0.5.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.4.1..v0.5.0
