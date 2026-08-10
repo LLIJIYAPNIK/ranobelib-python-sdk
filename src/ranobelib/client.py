@@ -217,6 +217,24 @@ class ApiClient:
         result: dict[str, Any] = response.json()
         return result
 
+    async def list_genres(self) -> list[dict[str, Any]]:
+        """Fetch the raw genre list shared across the whole lib.social network.
+
+        Unlike ``list_titles``, this endpoint isn't site-scoped by any request parameter
+        (confirmed: a ``Site-Id`` header changes nothing about the response) — it returns
+        every genre known to the network at once, each tagged with the site ids it applies
+        to via a ``site_ids`` field. Callers must filter to ``RANOBELIB_SITE_ID`` themselves
+        (see ``Catalog.list_genres``, which drops e.g. site-5-only genres like "Детское"
+        before returning).
+
+        Returns:
+            The raw ``data.genres`` array from the API response, unfiltered by site.
+        """
+        response = await self._get("/constants", params=httpx.QueryParams([("fields[]", "genres")]))
+        self._raise_for_status(response, not_found=RanobeLibError("Unexpected 404 from genre list"))
+        data: list[dict[str, Any]] = response.json()["data"]["genres"]
+        return data
+
     async def _get(self, url: str, *, params: Any = None) -> httpx.Response:
         """Issue a GET request, bounded by concurrency/pacing and retried on 429/5xx."""
         attempt = 0

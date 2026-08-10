@@ -12,8 +12,8 @@ from types import TracebackType
 from typing import Any, Self
 
 from ranobelib.cache import DEFAULT_CACHE_DIR, DiskCache
-from ranobelib.client import ApiClient
-from ranobelib.models import CatalogPage, Title
+from ranobelib.client import RANOBELIB_SITE_ID, ApiClient
+from ranobelib.models import CatalogPage, Genre, Title
 
 DEFAULT_SORT = "last_chapter_at"
 """Default sort order: title's last-chapter timestamp — the closest real equivalent to
@@ -94,9 +94,8 @@ class Catalog:
             query: Free-text search term, matched against name/rus_name/eng_name. ``None``
                 (the default) or an empty string lists without searching.
             genres: Genre ids to filter by. A title must have *all* of them, not just one
-                (AND, not OR — see docs/api-notes.md). The SDK doesn't validate these against
-                a known genre list — there's no public, unauthenticated way to fetch one (see
-                docs/api-notes.md) — an unrecognized id just matches nothing.
+                (AND, not OR — see docs/api-notes.md). Not validated against ``list_genres()``
+                before sending — an unrecognized id just matches nothing rather than erroring.
             status: A single ``Title.status.id`` to filter by (e.g. ongoing vs. completed).
             sort: Sort order. Despite the name, this is sent as the API's ``sort_by``
                 parameter — an actual ``sort`` parameter exists but is silently ignored by
@@ -136,6 +135,34 @@ class Catalog:
         self._cache.set(key, data)
         return _build_page(data)
 
+    async def list_genres(self, *, refresh: bool = False) -> list[Genre]:
+        """Fetch the full list of catalog genres (id → name), for use as filter options
+        with ``list_titles(genres=[...])``.
+
+        The underlying endpoint (``GET /api/constants?fields[]=genres``) has no site-scoping
+        parameter — it returns the full genre list shared across the whole lib.social
+        network in one shot, each tagged with the site ids it applies to (see
+        docs/api-notes.md). This filters that down to genres tagged for ranobelib.me before
+        returning, so callers don't get filter options (e.g. "Детское") that could never
+        match any ranobelib title.
+
+        Args:
+            refresh: Bypass the disk cache and re-fetch from the API even if the genre list
+                was already cached.
+
+        Returns:
+            Every ``Genre`` (id, name, adult flag) that applies to ranobelib.me.
+        """
+        key = "catalog:genres"
+        if not refresh:
+            cached = self._cache.get(key)
+            if cached is not None:
+                return _build_genres(cached)
+
+        data = await self._client.list_genres()
+        self._cache.set(key, data)
+        return _build_genres(data)
+
 
 def _cache_key(
     *,
@@ -154,3 +181,8 @@ def _build_page(data: dict[str, Any]) -> CatalogPage:
     items = [Title.model_validate(item) for item in data["data"]]
     meta = data["meta"]
     return CatalogPage(items=items, page=meta["current_page"], has_next_page=meta["has_next_page"])
+
+
+def _build_genres(data: list[dict[str, Any]]) -> list[Genre]:
+    site_id = int(RANOBELIB_SITE_ID)
+    return [Genre.model_validate(item) for item in data if site_id in item.get("site_ids", [])]
