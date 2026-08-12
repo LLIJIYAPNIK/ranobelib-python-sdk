@@ -500,6 +500,50 @@ useful default even at the cost of inconsistency with `genres`. Checked directly
   needs a tag id → name lookup independent of a specific title, so no `list_tags()` was
   added here.
 
+**Author/artist/team filter — not supported by the API at all (issue #51, not implemented):**
+
+Issue #51 proposed `author_id`/`artist_id`/`team_id` single-value filters on `list_titles()`
+(`Person.id`/`Person.id`/`Team.id` from `Title.authors`/`Title.artists`/`Title.teams`), the
+same shape as `status`, and explicitly flagged as an open question whether the API supports
+this at all — same caveat issue #50 raised for tags, which turned out to be unfounded there
+(tags *are* filterable). For author/artist/team, extensive checking against the live API
+found no supported mechanism whatsoever:
+
+- Brute-forced ~25 plausible `GET /api/manga` query parameter names against a real title's
+  known author id (`57847`, "kingCH") and team id (`23286`, "Stixs TEAM") — snake_case and
+  camelCase singular/plural variants (`author_id`, `authors[]`, `author_ids[]`, `people[]`,
+  `people_ids[]`, `artist_id`, `artists_id[]`, `team_id`, `teams[]`, `translator_id`,
+  `translators[]`, `user_id`, `creator_id`, `publisher_id`, `franchise_id`, `authorId`,
+  `teamId`, `author_slug`, `team_slug`, ...), plus a Laravel-style bracket-filter guess
+  (`filter[author_id]=...`, checked with `curl -g` to rule out shell/URL-globbing false
+  positives). Every single one returned **the exact same result set as no filter at all** —
+  silently ignored, not a 422 (this API generally doesn't reject unknown query parameters,
+  so silence here isn't as strong a signal as `genres[]`/`tags[]`'s AND-semantics tests, but
+  combined with the points below it's conclusive enough not to guess further).
+- No dedicated "titles by this person/team" sub-endpoint exists either:
+  `GET /api/people/{slug_url}/manga`, `.../titles`, `GET /api/teams/{slug_url}/manga`,
+  `.../titles` are all **404**.
+- `GET /api/people/{slug_url}` (a real, working, unauthenticated endpoint — returns id,
+  name, avatar, `titles_count_details` per site id, subscriber stats) doesn't expose an
+  actual title list through any `fields[]` value tried (`manga`, `titles`, `works`,
+  `franchise`) — response shape is identical regardless, and even a clearly-bogus
+  `fields[]` value doesn't error the way it does on `/api/manga/{slug}` (`{"fields.0":
+  [...]}`), suggesting `fields[]` isn't wired up for this endpoint at all, not just missing
+  these particular values.
+- Checked whether the free-text `q` search (documented above as matching
+  name/rus_name/eng_name) incidentally matches author name as a fallback: `q=kingCH`
+  (the exact name of a real credited author) returns **0 results**, even though that
+  author has exactly one real title on ranobelib.me. So there's no id-based *or*
+  name-based way to search/filter the catalog by author/artist/team through this API.
+
+**Conclusion: not implemented.** Adding `author_id`/`artist_id`/`team_id` parameters that
+silently do nothing (since nothing on the wire would ever narrow results) would be worse
+than not having them — a filter that looks like it works but doesn't is actively misleading,
+unlike e.g. `genres`/`tags`/`country`, which are all confirmed-working real filters. If the
+API adds this capability later, or a working parameter name surfaces from a source other
+than guessing (e.g. observing the real ranobelib.me frontend's own network requests), this
+can be revisited then — not before.
+
 **Status filter — `status[]`, not `status`:**
 
 `status=1` (scalar) is **422** (`"Поле status должно быть массивом."` — must be an array),
