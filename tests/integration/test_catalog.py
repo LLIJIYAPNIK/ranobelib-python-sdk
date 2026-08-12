@@ -56,6 +56,29 @@ async def test_list_titles_filters_by_genres_and_status_combined() -> None:
 
 
 @pytest.mark.vcr
+async def test_list_titles_filters_by_tags() -> None:
+    async with Catalog() as catalog:
+        # 218 = "Боги" (Gods) — see docs/api-notes.md, "Tag filter". Catalog listing items
+        # don't send `tags` (same as `genres`, see docs/api-notes.md), so unlike the country
+        # filter test above this can only confirm the filter narrows results, not inspect
+        # each item's tags directly.
+        page = await catalog.list_titles(tags=[218], per_page=10)
+
+    assert page.items
+
+
+@pytest.mark.vcr
+async def test_list_titles_tags_filter_uses_and_not_or_semantics() -> None:
+    async with Catalog() as catalog:
+        # Combining a real tag id with a nonexistent one: an OR filter would still match on
+        # the real id, an AND filter matches nothing — confirms `tags` behaves like `genres`
+        # (AND), not the OR the linked issue considered plausible. See docs/api-notes.md.
+        page = await catalog.list_titles(tags=[218, 999999], per_page=10)
+
+    assert page.items == []
+
+
+@pytest.mark.vcr
 async def test_list_titles_pagination_advances_to_different_items() -> None:
     async with Catalog() as catalog:
         first = await catalog.list_titles(page=1, per_page=10, sort="name")

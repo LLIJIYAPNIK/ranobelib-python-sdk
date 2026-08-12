@@ -79,6 +79,7 @@ class Catalog:
         per_page: int = 30,
         query: str | None = None,
         genres: list[int] | None = None,
+        tags: list[int] | None = None,
         status: int | None = None,
         country: int | None = None,
         sort: str = DEFAULT_SORT,
@@ -97,6 +98,11 @@ class Catalog:
             genres: Genre ids to filter by. A title must have *all* of them, not just one
                 (AND, not OR — see docs/api-notes.md). Not validated against ``list_genres()``
                 before sending — an unrecognized id just matches nothing rather than erroring.
+            tags: ``Tag.id``s (from ``Title.tags``) to filter by. Same AND semantics as
+                ``genres`` — a title must have *all* of them, not just any one (confirmed
+                against the live API, see docs/api-notes.md; not the OR some might expect
+                from tags being more numerous/specific than genres). Also not validated
+                before sending, same as ``genres``.
             status: A single ``Title.status.id`` to filter by (e.g. ongoing vs. completed).
             country: A single ``Country.id`` to filter by — a title only has one country of
                 origin, unlike ``genres``. Ids come from ``list_countries()``. Sent on the
@@ -132,6 +138,7 @@ class Catalog:
             per_page=per_page,
             query=query,
             genres=genres,
+            tags=tags,
             status=status,
             country=country,
             sort=sort,
@@ -146,6 +153,7 @@ class Catalog:
             per_page=per_page,
             query=query,
             genres=genres,
+            tags=tags,
             status=status,
             country=country,
             sort=sort,
@@ -215,12 +223,17 @@ def _cache_key(
     per_page: int,
     query: str | None,
     genres: list[int] | None,
+    tags: list[int] | None,
     status: int | None,
     country: int | None,
     sort: str,
 ) -> str:
     genres_part = ",".join(str(genre_id) for genre_id in genres or [])
-    return f"catalog:{page}:{per_page}:{query or ''}:{genres_part}:{status}:{country}:{sort}"
+    tags_part = ",".join(str(tag_id) for tag_id in tags or [])
+    return (
+        f"catalog:{page}:{per_page}:{query or ''}:{genres_part}:{tags_part}:"
+        f"{status}:{country}:{sort}"
+    )
 
 
 def _build_page(data: dict[str, Any]) -> CatalogPage:

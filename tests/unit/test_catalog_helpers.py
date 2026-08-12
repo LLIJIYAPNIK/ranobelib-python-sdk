@@ -39,43 +39,123 @@ def test_build_page_handles_empty_results() -> None:
 
 def test_cache_key_differs_by_page() -> None:
     key1 = _cache_key(
-        page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
+        page=1,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=None,
+        status=None,
+        country=None,
+        sort="name",
     )
     key2 = _cache_key(
-        page=2, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
+        page=2,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=None,
+        status=None,
+        country=None,
+        sort="name",
     )
 
     assert key1 != key2
 
 
-def test_cache_key_differs_by_query_genres_status_country_and_sort() -> None:
+def test_cache_key_differs_by_query_genres_tags_status_country_and_sort() -> None:
     base = _cache_key(
-        page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
+        page=1,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=None,
+        status=None,
+        country=None,
+        sort="name",
     )
 
     assert base != _cache_key(
-        page=1, per_page=30, query="dxd", genres=None, status=None, country=None, sort="name"
+        page=1,
+        per_page=30,
+        query="dxd",
+        genres=None,
+        tags=None,
+        status=None,
+        country=None,
+        sort="name",
     )
     assert base != _cache_key(
-        page=1, per_page=30, query=None, genres=[34], status=None, country=None, sort="name"
+        page=1,
+        per_page=30,
+        query=None,
+        genres=[34],
+        tags=None,
+        status=None,
+        country=None,
+        sort="name",
     )
     assert base != _cache_key(
-        page=1, per_page=30, query=None, genres=None, status=1, country=None, sort="name"
+        page=1,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=[218],
+        status=None,
+        country=None,
+        sort="name",
     )
     assert base != _cache_key(
-        page=1, per_page=30, query=None, genres=None, status=None, country=10, sort="name"
+        page=1,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=None,
+        status=1,
+        country=None,
+        sort="name",
     )
     assert base != _cache_key(
-        page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="views"
+        page=1,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=None,
+        status=None,
+        country=10,
+        sort="name",
+    )
+    assert base != _cache_key(
+        page=1,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=None,
+        status=None,
+        country=None,
+        sort="views",
     )
 
 
 def test_cache_key_stable_for_equivalent_calls() -> None:
     key1 = _cache_key(
-        page=1, per_page=30, query="dxd", genres=[1, 2], status=1, country=10, sort="name"
+        page=1,
+        per_page=30,
+        query="dxd",
+        genres=[1, 2],
+        tags=[218],
+        status=1,
+        country=10,
+        sort="name",
     )
     key2 = _cache_key(
-        page=1, per_page=30, query="dxd", genres=[1, 2], status=1, country=10, sort="name"
+        page=1,
+        per_page=30,
+        query="dxd",
+        genres=[1, 2],
+        tags=[218],
+        status=1,
+        country=10,
+        sort="name",
     )
 
     assert key1 == key2

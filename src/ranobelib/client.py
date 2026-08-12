@@ -170,6 +170,7 @@ class ApiClient:
         per_page: int,
         query: str | None,
         genres: list[int] | None,
+        tags: list[int] | None,
         status: int | None,
         country: int | None,
         sort: str,
@@ -188,6 +189,8 @@ class ApiClient:
                 or empty omits the ``q`` parameter entirely.
             genres: Genre ids to filter by. A title must have *all* of them (AND, not OR —
                 see docs/api-notes.md), not just any one.
+            tags: Tag ids to filter by. Same AND semantics as ``genres`` — a title must have
+                *all* of them, not just any one (see docs/api-notes.md).
             status: A single ``Title.status.id`` to filter by.
             country: A single ``Country.id`` to filter by. Sent on the wire as ``types[]``
                 (repeatable array parameter, but only ever given one value here) — the API's
@@ -210,6 +213,8 @@ class ApiClient:
             params.append(("q", query))
         for genre_id in genres or []:
             params.append(("genres[]", str(genre_id)))
+        for tag_id in tags or []:
+            params.append(("tags[]", str(tag_id)))
         if status is not None:
             params.append(("status[]", str(status)))
         if country is not None:

@@ -64,6 +64,19 @@ async def main() -> None:
         for title in korean_page.items[:5]:
             print(f"  {title.id}: {title.name}")
 
+        # `tags` filters the same way `genres` does (AND semantics — a title must have
+        # *all* given tag ids, confirmed against the live API even though tags are more
+        # numerous/specific than genres, see docs/api-notes.md), but there's no
+        # `list_countries()`/`list_genres()`-style `list_tags()` lookup: unlike genres/
+        # countries, this SDK's own tag ids/names only ever come from a Title already
+        # fetched elsewhere (e.g. `title.tags` from `RanobeLib.get_info()`, or from a
+        # previous catalog result's `.tags` — though catalog listing items don't send
+        # `tags`, same as `genres`). 218 = "Боги" (Gods), found that way in a real title.
+        tag_page = await catalog.list_titles(tags=[218], per_page=10)
+        print(f"\n{len(tag_page.items)} 'Боги' titles on page 1:")
+        for title in tag_page.items[:5]:
+            print(f"  {title.id}: {title.name}")
+
         # `sort` picks the ordering — despite the keyword name, this is sent to the API as
         # `sort_by`; a real `sort` parameter exists on the wire but the API silently ignores
         # it (see docs/api-notes.md). Default is "last_chapter_at" (most recently updated).
@@ -107,6 +120,13 @@ asyncio.run(main())
 #   214246: gwedame tteoreojyeodo chulgeuneul haeya haneunguna
 #   40022: agdang daegongnim-ui gwihadigwihan yeodongsaeng
 #   268050: I'll Become the Academy Gacha Villain
+#
+# 10 'Боги' titles on page 1:
+#   6720: Tondemo Skill de Isekai Hourou Meshi (WN)
+#   243244: Yǐ yī lóng zhī lì dǎdǎo zhěnggè shìjiè!
+#   271058: Kuàichuān gōnglüè: Yāoniè sùzhǔ, kāiguà le
+#   227705: Shepherd Wizard
+#   265281: Harem System In A fantasy World
 #
 # 5 newest titles: ['Chwimi Bangsongimnida', 'Ropan Sok Choijongboseuneun Deo Isang Chamji
 # Anneunda', 'domangchin agonganeuro EX-ga Jjotawatta', 'Kimi wa Boku no Regret', 'Ani,
