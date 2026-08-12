@@ -470,7 +470,35 @@ couldn't possibly match any ranobelib title — see `catalog.py`'s `_build_genre
 while probing, not otherwise used by this SDK): `tags`, `status`, `types`,
 `imageServers` — each 403-free the same way `genres` is. Not investigated further; noted
 here in case a future feature needs one of them (same "don't guess, check first" principle
-as this whole section).
+as this whole section). (`types` was picked up later for issue #48, see "Country/origin
+filter" below; `tags` still isn't used for anything beyond the filter parameter itself, see
+next.)
+
+**Tag filter — `tags[]`, AND semantics, same as genres (issue #50):**
+
+Issue #50 (companion app wants each tag badge on a title page to link to the catalog
+pre-filtered to that tag, same as genre badges already do with `genres=[...]`) asked
+whether the API supports filtering by tag id at all, and if so whether the match is AND or
+OR — tags being more numerous/specific than genres made OR seem plausible as the more
+useful default even at the cost of inconsistency with `genres`. Checked directly:
+
+- `tags[]=<id>` is a real, working filter — confirmed by checking that a title present in
+  `tags[]=218` results (id `129971`, "Immortal Drunkard") actually has tag id `218`
+  ("Боги") in its own `fields[]=tags` response.
+- It's **AND, not OR — same semantics as `genres[]`, contradicting the issue's OR guess**.
+  Same test methodology as the genre AND confirmation above: combining a real tag id with a
+  nonexistent one (`tags[]=218&tags[]=999999`) returns **0 results**, not the same non-zero
+  count as `tags[]=218` alone — an OR filter would still have matched on the real id.
+- Unknown tag ids don't error (`tags[]=999999` alone → 200, `"data": []`, not a 422) — no
+  server-side whitelist, same as `genres[]` and unlike `status[]`/`types[]`. This SDK
+  doesn't validate `tags` against a tag catalog before sending, same reasoning as `genres`.
+- Not investigated as part of this issue (out of scope — the issue only asked for the
+  filter, not a listing endpoint): whether `GET /api/constants?fields[]=tags` (noted as
+  present but unexplored above) would support a future `Catalog.list_tags()` the way
+  `fields[]=genres`/`fields[]=types` do for genres/countries. Unlike those two, this issue's
+  actual use case (companion linking a tag badge already rendered from `Title.tags`) never
+  needs a tag id → name lookup independent of a specific title, so no `list_tags()` was
+  added here.
 
 **Status filter — `status[]`, not `status`:**
 

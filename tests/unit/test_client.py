@@ -174,6 +174,7 @@ async def test_list_titles_sends_expected_query_params() -> None:
         assert request.url.params["sort_by"] == "last_chapter_at"
         assert request.url.params["q"] == "dxd"
         assert request.url.params.get_list("genres[]") == ["34", "35"]
+        assert request.url.params.get_list("tags[]") == ["218", "232"]
         assert request.url.params.get_list("status[]") == ["1"]
         assert request.url.params.get_list("types[]") == ["10"]
         return httpx.Response(200, json={"data": [], "meta": {}})
@@ -184,6 +185,7 @@ async def test_list_titles_sends_expected_query_params() -> None:
             per_page=30,
             query="dxd",
             genres=[34, 35],
+            tags=[218, 232],
             status=1,
             country=10,
             sort="last_chapter_at",
@@ -194,13 +196,21 @@ async def test_list_titles_omits_optional_params_when_not_given() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert "q" not in request.url.params
         assert "genres[]" not in request.url.params
+        assert "tags[]" not in request.url.params
         assert "status[]" not in request.url.params
         assert "types[]" not in request.url.params
         return httpx.Response(200, json={"data": [], "meta": {}})
 
     async with _client(handler) as client:
         await client.list_titles(
-            page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
+            page=1,
+            per_page=30,
+            query=None,
+            genres=None,
+            tags=None,
+            status=None,
+            country=None,
+            sort="name",
         )
 
 
@@ -212,7 +222,14 @@ async def test_list_titles_returns_full_response_body() -> None:
 
     async with _client(handler) as client:
         result = await client.list_titles(
-            page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
+            page=1,
+            per_page=30,
+            query=None,
+            genres=None,
+            tags=None,
+            status=None,
+            country=None,
+            sort="name",
         )
 
     assert result == payload
@@ -225,7 +242,14 @@ async def test_list_titles_raises_rate_limit_error_on_429() -> None:
     async with _client(handler) as client:
         with pytest.raises(RateLimitError):
             await client.list_titles(
-                page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
+                page=1,
+                per_page=30,
+                query=None,
+                genres=None,
+                tags=None,
+                status=None,
+                country=None,
+                sort="name",
             )
 
 
@@ -240,6 +264,7 @@ async def test_list_titles_wraps_validation_error_in_ranobelib_error() -> None:
                 per_page=30,
                 query=None,
                 genres=None,
+                tags=None,
                 status=None,
                 country=None,
                 sort="bogus",
@@ -284,7 +309,32 @@ async def test_list_titles_sends_country_as_types_query_param() -> None:
 
     async with _client(handler) as client:
         await client.list_titles(
-            page=1, per_page=30, query=None, genres=None, status=None, country=10, sort="name"
+            page=1,
+            per_page=30,
+            query=None,
+            genres=None,
+            tags=None,
+            status=None,
+            country=10,
+            sort="name",
+        )
+
+
+async def test_list_titles_sends_tags_query_param() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params.get_list("tags[]") == ["218"]
+        return httpx.Response(200, json={"data": [], "meta": {}})
+
+    async with _client(handler) as client:
+        await client.list_titles(
+            page=1,
+            per_page=30,
+            query=None,
+            genres=None,
+            tags=[218],
+            status=None,
+            country=None,
+            sort="name",
         )
 
 
