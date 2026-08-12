@@ -20,14 +20,19 @@ def vcr_config() -> dict[str, Any]:
 
 @pytest.fixture(autouse=True)
 def _isolated_disk_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Point RanobeLib's default cache_dir at a per-test tmp_path.
+    """Point RanobeLib's and Catalog's default cache_dir at a per-test tmp_path.
 
-    Without this, every ``RanobeLib(url)`` call in the test suite (the vast majority don't
-    pass ``cache_dir`` explicitly) would share one real ``.ranobelib_cache/`` directory
-    under the repo root across test runs — polluting the repo and letting cached responses
-    from a previous run silently replace what a cassette is supposed to be verifying.
+    Without this, every ``RanobeLib(url)``/``Catalog()`` call in the test suite (the vast
+    majority don't pass ``cache_dir`` explicitly) would share one real ``.ranobelib_cache/``
+    directory under the repo root across test runs — polluting the repo and letting cached
+    responses from a previous run silently replace what a cassette is supposed to be
+    verifying. Both ``ranobelib.sdk`` and ``ranobelib.catalog`` import their own
+    ``DEFAULT_CACHE_DIR`` binding from ``ranobelib.cache`` (module-level `from ... import`,
+    not an attribute lookup through ``ranobelib.cache`` at call time), so each needs its own
+    patch target — patching one doesn't affect the other.
     """
     monkeypatch.setattr("ranobelib.sdk.DEFAULT_CACHE_DIR", tmp_path / ".ranobelib_cache")
+    monkeypatch.setattr("ranobelib.catalog.DEFAULT_CACHE_DIR", tmp_path / ".ranobelib_cache")
 
 
 @pytest.fixture(autouse=True)
