@@ -1,4 +1,4 @@
-"""List/search the ranobelib.me catalog with Catalog.list_titles()/Catalog.list_genres().
+"""List/search the ranobelib.me catalog with Catalog.list_titles()/list_genres()/list_countries().
 
 Catalog is a separate entry point from RanobeLib: browsing/searching the whole site isn't
 scoped to any one title, so it doesn't belong on the class that's built around a title's URL.
@@ -46,6 +46,24 @@ async def main() -> None:
         for title in completed_page.items[:5]:
             print(f"  {title.id}: {title.name}")
 
+        # `list_countries()` is the id -> name lookup for the `country` filter below, same
+        # pattern as `list_genres()` above (network-wide constants endpoint, filtered down to
+        # ranobelib.me by Catalog). Despite the name, this covers more than literal countries
+        # for ranobelib.me specifically — three real countries (Japan/Korea/China) plus three
+        # non-national origin categories the site classifies the same way (original English,
+        # original/non-translated, fanfiction) — see docs/api-notes.md.
+        countries = await catalog.list_countries()
+        print(f"\n{len(countries)} countries available: {[country.name for country in countries]}")
+        korea = next(country for country in countries if country.name == "Корея")
+
+        # `country` takes a single id, unlike `genres` — a title only has one country of
+        # origin. Every returned Title's `.country` reflects it (also populated on
+        # RanobeLib.get_info() results, since it's the same model field).
+        korean_page = await catalog.list_titles(country=korea.id, per_page=10)
+        print(f"\n5 titles from {korea.name}:")
+        for title in korean_page.items[:5]:
+            print(f"  {title.id}: {title.name}")
+
         # `sort` picks the ordering — despite the keyword name, this is sent to the API as
         # `sort_by`; a real `sort` parameter exists on the wire but the API silently ignores
         # it (see docs/api-notes.md). Default is "last_chapter_at" (most recently updated).
@@ -68,18 +86,28 @@ asyncio.run(main())
 # 54 genres available, e.g.: ['Арт', 'Безумие', 'Боевик', 'Боевые искусства', 'Вампиры']
 #
 # 5 'Боевик' titles:
-#   270852: Heonteo Yeogo-ui Namseonsaeng
-#   69254: Legend of the Northern Blade (Novel)
-#   51849: Hoegwija sayongseolmyeongseo (Novel)
-#   267443: Dong Jing Kuang Jing
-#   89805: Na honja teugseongmuhan (Novel)
+#   135591: Reaper of the Drifting Moon (Novel)
+#   227705: Shepherd Wizard
+#   43981: Metcha shōkan sa reta kudan (Novel)
+#   166389: Già Thiên
+#   243244: Yǐ yī lóng zhī lì dǎdǎo zhěnggè shìjiè!
 #
 # 10 completed titles on page 1:
 #   270852: Heonteo Yeogo-ui Namseonsaeng
-#   96586: zhè yóu xì yě tài zhēnshí liǎo
-#   219202: hoegwihan yongbyeong-eun da gyehoeg-i issda
-#   69254: Legend of the Northern Blade (Novel)
-#   271058: Kuàichuān gōnglüè: Yāoniè sùzhǔ, kāiguà le
+#   135591: Reaper of the Drifting Moon (Novel)
+#   227705: Shepherd Wizard
+#   18802: Xiu Zhen Liao Tian Qun
+#   166389: Già Thiên
 #
-# 5 newest titles: ['Segyesu yeohaengsa : Sgeub meogbangdaemoheom paekiji!', 'Guai Wu Bei Sha
-# Jiu Hui Si', 'Жестокая месть', 'Пока дым не рассеется', 'Плачущий демон и диванный политик']
+# 6 countries available: ['Япония', 'Корея', 'Китай', 'Английский', 'Авторский', 'Фанфик']
+#
+# 5 titles from Корея:
+#   227705: Shepherd Wizard
+#   135591: Reaper of the Drifting Moon (Novel)
+#   214246: gwedame tteoreojyeodo chulgeuneul haeya haneunguna
+#   40022: agdang daegongnim-ui gwihadigwihan yeodongsaeng
+#   268050: I'll Become the Academy Gacha Villain
+#
+# 5 newest titles: ['Chwimi Bangsongimnida', 'Ropan Sok Choijongboseuneun Deo Isang Chamji
+# Anneunda', 'domangchin agonganeuro EX-ga Jjotawatta', 'Kimi wa Boku no Regret', 'Ani,
+# jeoneun hwangnyeonimman kkosyeotdanikkayo?']

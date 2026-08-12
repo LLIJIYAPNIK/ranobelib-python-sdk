@@ -1,0 +1,130 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      host:
+      - api.cdnlibs.org
+      site-id:
+      - '3'
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/constants?fields%5B%5D=types
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAACA52TTWvDMAyG/8rQOQN/KK2TWw+7jeUyetnKcL4g0MOg2WGE/PdRucyKEydbLyIo
+        0iP59esBattbyAfovz+bC+RvA3Q15CKBsy2bM+Tw/iVQ1teoU4qG4p6i8nmUFF2G6rGk7wwSuHR9
+        89HV1wGnMXEzZDCjomrh+7V2mWm/TDBRvxD0kOLp+ZEa7gKlW9tgyk68itptoioPxD/sZqZAJVjj
+        XYfNgg0ttTQM6C7ZuotdQ8nAKqqlzpYRa0/EdsrSniPjO6FgNosT1CLBMFuKJUMygg4Ic1lLpk7m
+        ba8tz0f5uMhXbEN23n+RA/sqnHkO+b1GOcy7r8cHQkkmvmAQ911OUalH7RdXMl5G9wx0FSWYTUs0
+        TLq5iVP/91bv4o7Vi+j04JHcdGgZ2awroNjTKI6HaBlzfvESL1u2NzdkO+s9jeMPvSNGDeMFAAA=
+    headers:
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Wed, 12 Aug 2026 16:01:01 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=0ZEALLKuiUNlvT5y; Domain=.cdnlibs.org; Path=/; Expires=Wed, 12-Aug-2026
+        16:21:01 GMT
+      - __ddg10_=1786550461; Domain=.cdnlibs.org; Path=/; Expires=Wed, 12-Aug-2026
+        16:21:01 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Wed, 12-Aug-2026
+        16:21:01 GMT
+      - __ddg1_=LlpLozCRstyWQb9x5EqZ; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Thu,
+        12-Aug-2027 16:01:01 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '95'
+    status:
+      code: 200
+      message: OK
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      cookie:
+      - __ddg8_=0ZEALLKuiUNlvT5y; __ddg10_=1786550461; __ddg9_=80.242.56.154; __ddg1_=LlpLozCRstyWQb9x5EqZ
+      host:
+      - api.cdnlibs.org
+      site-id:
+      - '3'
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/constants?fields%5B%5D=types
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAACA52TTWvDMAyG/8rQOQN/KK2TWw+7jeUyetnKcL4g0MOg2WGE/PdRucyKEydbLyIo
+        0iP59esBattbyAfovz+bC+RvA3Q15CKBsy2bM+Tw/iVQ1teoU4qG4p6i8nmUFF2G6rGk7wwSuHR9
+        89HV1wGnMXEzZDCjomrh+7V2mWm/TDBRvxD0kOLp+ZEa7gKlW9tgyk68itptoioPxD/sZqZAJVjj
+        XYfNgg0ttTQM6C7ZuotdQ8nAKqqlzpYRa0/EdsrSniPjO6FgNosT1CLBMFuKJUMygg4Ic1lLpk7m
+        ba8tz0f5uMhXbEN23n+RA/sqnHkO+b1GOcy7r8cHQkkmvmAQ911OUalH7RdXMl5G9wx0FSWYTUs0
+        TLq5iVP/91bv4o7Vi+j04JHcdGgZ2awroNjTKI6HaBlzfvESL1u2NzdkO+s9jeMPvSNGDeMFAAA=
+    headers:
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Wed, 12 Aug 2026 16:01:01 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=4dhmroZln5vv0LVy; Domain=.cdnlibs.org; Path=/; Expires=Wed, 12-Aug-2026
+        16:21:01 GMT
+      - __ddg10_=1786550461; Domain=.cdnlibs.org; Path=/; Expires=Wed, 12-Aug-2026
+        16:21:01 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Wed, 12-Aug-2026
+        16:21:01 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '94'
+    status:
+      code: 200
+      message: OK
+version: 1

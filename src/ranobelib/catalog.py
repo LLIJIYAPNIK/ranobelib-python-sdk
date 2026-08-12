@@ -13,7 +13,7 @@ from typing import Any, Self
 
 from ranobelib.cache import DEFAULT_CACHE_DIR, DiskCache
 from ranobelib.client import RANOBELIB_SITE_ID, ApiClient
-from ranobelib.models import CatalogPage, Genre, Title
+from ranobelib.models import CatalogPage, Country, Genre, Title
 
 DEFAULT_SORT = "last_chapter_at"
 """Default sort order: title's last-chapter timestamp — the closest real equivalent to
@@ -80,6 +80,7 @@ class Catalog:
         query: str | None = None,
         genres: list[int] | None = None,
         status: int | None = None,
+        country: int | None = None,
         sort: str = DEFAULT_SORT,
         refresh: bool = False,
     ) -> CatalogPage:
@@ -97,6 +98,11 @@ class Catalog:
                 (AND, not OR — see docs/api-notes.md). Not validated against ``list_genres()``
                 before sending — an unrecognized id just matches nothing rather than erroring.
             status: A single ``Title.status.id`` to filter by (e.g. ongoing vs. completed).
+            country: A single ``Country.id`` to filter by — a title only has one country of
+                origin, unlike ``genres``. Ids come from ``list_countries()``. Sent on the
+                wire as the API's ``types[]`` parameter, not a ``country``/``countries[]``
+                one — see docs/api-notes.md for why (``Country`` mirrors the API's own
+                "type" concept, which isn't strictly limited to literal countries).
             sort: Sort order. Despite the name, this is sent as the API's ``sort_by``
                 parameter — an actual ``sort`` parameter exists but is silently ignored by
                 the API (see docs/api-notes.md). Known accepted values: ``"name"``,
@@ -122,7 +128,13 @@ class Catalog:
             )
 
         key = _cache_key(
-            page=page, per_page=per_page, query=query, genres=genres, status=status, sort=sort
+            page=page,
+            per_page=per_page,
+            query=query,
+            genres=genres,
+            status=status,
+            country=country,
+            sort=sort,
         )
         if not refresh:
             cached = self._cache.get(key)
@@ -130,7 +142,13 @@ class Catalog:
                 return _build_page(cached)
 
         data = await self._client.list_titles(
-            page=page, per_page=per_page, query=query, genres=genres, status=status, sort=sort
+            page=page,
+            per_page=per_page,
+            query=query,
+            genres=genres,
+            status=status,
+            country=country,
+            sort=sort,
         )
         self._cache.set(key, data)
         return _build_page(data)
@@ -163,6 +181,33 @@ class Catalog:
         self._cache.set(key, data)
         return _build_genres(data)
 
+    async def list_countries(self, *, refresh: bool = False) -> list[Country]:
+        """Fetch the full list of catalog countries (id → name), for use as filter options
+        with ``list_titles(country=...)``.
+
+        Mirrors ``list_genres()`` exactly, down to the network-wide, not-site-scoped shape
+        of the underlying endpoint (``GET /api/constants?fields[]=types`` — the API's own
+        name for what this SDK calls "country" is "type", see docs/api-notes.md and
+        ``Country``'s docstring). This filters that down to entries tagged for ranobelib.me
+        before returning, same as ``list_genres()`` does for genres.
+
+        Args:
+            refresh: Bypass the disk cache and re-fetch from the API even if the country
+                list was already cached.
+
+        Returns:
+            Every ``Country`` (id, name) that applies to ranobelib.me.
+        """
+        key = "catalog:countries"
+        if not refresh:
+            cached = self._cache.get(key)
+            if cached is not None:
+                return _build_countries(cached)
+
+        data = await self._client.list_countries()
+        self._cache.set(key, data)
+        return _build_countries(data)
+
 
 def _cache_key(
     *,
@@ -171,10 +216,11 @@ def _cache_key(
     query: str | None,
     genres: list[int] | None,
     status: int | None,
+    country: int | None,
     sort: str,
 ) -> str:
     genres_part = ",".join(str(genre_id) for genre_id in genres or [])
-    return f"catalog:{page}:{per_page}:{query or ''}:{genres_part}:{status}:{sort}"
+    return f"catalog:{page}:{per_page}:{query or ''}:{genres_part}:{status}:{country}:{sort}"
 
 
 def _build_page(data: dict[str, Any]) -> CatalogPage:
@@ -186,3 +232,8 @@ def _build_page(data: dict[str, Any]) -> CatalogPage:
 def _build_genres(data: list[dict[str, Any]]) -> list[Genre]:
     site_id = int(RANOBELIB_SITE_ID)
     return [Genre.model_validate(item) for item in data if site_id in item.get("site_ids", [])]
+
+
+def _build_countries(data: list[dict[str, Any]]) -> list[Country]:
+    site_id = int(RANOBELIB_SITE_ID)
+    return [Country.model_validate(item) for item in data if site_id in item.get("site_ids", [])]

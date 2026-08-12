@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from ranobelib import Catalog, CatalogPage, Genre, Title
+from ranobelib import Catalog, CatalogPage, Country, Genre, Title
 
 
 @pytest.mark.vcr
@@ -33,6 +33,17 @@ async def test_list_titles_filters_by_status() -> None:
 
     assert page.items
     assert all(item.status.id == 1 for item in page.items)
+
+
+@pytest.mark.vcr
+async def test_list_titles_filters_by_country() -> None:
+    async with Catalog() as catalog:
+        # 11 = Korea (see docs/api-notes.md, "Country/origin filter") — a title only has
+        # one country, so this doesn't need the list-of-ids shape `genres` uses.
+        page = await catalog.list_titles(country=11, per_page=10)
+
+    assert page.items
+    assert all(item.country is not None and item.country.id == 11 for item in page.items)
 
 
 @pytest.mark.vcr
@@ -139,5 +150,50 @@ async def test_list_genres_refresh_bypasses_cache(tmp_path: Path, vcr: object) -
     async with Catalog(cache_dir=tmp_path) as catalog:
         await catalog.list_genres()
         await catalog.list_genres(refresh=True)
+
+    assert len(vcr.requests) == 2  # type: ignore[attr-defined]
+
+
+@pytest.mark.vcr
+async def test_list_countries_returns_countries_with_id_and_name() -> None:
+    async with Catalog() as catalog:
+        countries = await catalog.list_countries()
+
+    assert countries
+    assert all(isinstance(country, Country) for country in countries)
+    assert all(country.id and country.name for country in countries)
+    # Id 11 is used elsewhere in this test suite as a `list_titles(country=11)` filter value
+    # (see test_list_titles_filters_by_country) — confirm it resolves to "Корея" (Korea) here.
+    assert any(country.id == 11 and country.name == "Корея" for country in countries)
+
+
+@pytest.mark.vcr
+async def test_list_countries_excludes_types_not_tagged_for_ranobelib() -> None:
+    async with Catalog() as catalog:
+        countries = await catalog.list_countries()
+
+    # Type 1 ("Манга") is tagged site_ids: [1, 2, 4] only in the raw API response (see
+    # docs/api-notes.md, "Country/origin filter") — ranobelib.me is site 3, so it must be
+    # filtered out, same as list_genres() does for genre 88.
+    assert all(country.id != 1 for country in countries)
+
+
+@pytest.mark.vcr
+async def test_list_countries_second_call_same_params_is_served_from_cache(
+    tmp_path: Path, vcr: object
+) -> None:
+    async with Catalog(cache_dir=tmp_path) as catalog:
+        first = await catalog.list_countries()
+        second = await catalog.list_countries()
+
+    assert first == second
+    assert len(vcr.requests) == 1  # type: ignore[attr-defined]
+
+
+@pytest.mark.vcr
+async def test_list_countries_refresh_bypasses_cache(tmp_path: Path, vcr: object) -> None:
+    async with Catalog(cache_dir=tmp_path) as catalog:
+        await catalog.list_countries()
+        await catalog.list_countries(refresh=True)
 
     assert len(vcr.requests) == 2  # type: ignore[attr-defined]

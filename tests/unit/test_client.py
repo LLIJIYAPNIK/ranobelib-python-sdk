@@ -175,6 +175,7 @@ async def test_list_titles_sends_expected_query_params() -> None:
         assert request.url.params["q"] == "dxd"
         assert request.url.params.get_list("genres[]") == ["34", "35"]
         assert request.url.params.get_list("status[]") == ["1"]
+        assert request.url.params.get_list("types[]") == ["10"]
         return httpx.Response(200, json={"data": [], "meta": {}})
 
     async with _client(handler) as client:
@@ -184,6 +185,7 @@ async def test_list_titles_sends_expected_query_params() -> None:
             query="dxd",
             genres=[34, 35],
             status=1,
+            country=10,
             sort="last_chapter_at",
         )
 
@@ -193,11 +195,12 @@ async def test_list_titles_omits_optional_params_when_not_given() -> None:
         assert "q" not in request.url.params
         assert "genres[]" not in request.url.params
         assert "status[]" not in request.url.params
+        assert "types[]" not in request.url.params
         return httpx.Response(200, json={"data": [], "meta": {}})
 
     async with _client(handler) as client:
         await client.list_titles(
-            page=1, per_page=30, query=None, genres=None, status=None, sort="name"
+            page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
         )
 
 
@@ -209,7 +212,7 @@ async def test_list_titles_returns_full_response_body() -> None:
 
     async with _client(handler) as client:
         result = await client.list_titles(
-            page=1, per_page=30, query=None, genres=None, status=None, sort="name"
+            page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
         )
 
     assert result == payload
@@ -222,7 +225,7 @@ async def test_list_titles_raises_rate_limit_error_on_429() -> None:
     async with _client(handler) as client:
         with pytest.raises(RateLimitError):
             await client.list_titles(
-                page=1, per_page=30, query=None, genres=None, status=None, sort="name"
+                page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
             )
 
 
@@ -233,7 +236,13 @@ async def test_list_titles_wraps_validation_error_in_ranobelib_error() -> None:
     async with _client(handler) as client:
         with pytest.raises(RanobeLibError):
             await client.list_titles(
-                page=1, per_page=30, query=None, genres=None, status=None, sort="bogus"
+                page=1,
+                per_page=30,
+                query=None,
+                genres=None,
+                status=None,
+                country=None,
+                sort="bogus",
             )
 
 
@@ -266,6 +275,48 @@ async def test_list_genres_raises_rate_limit_error_on_429() -> None:
     async with _client(handler) as client:
         with pytest.raises(RateLimitError):
             await client.list_genres()
+
+
+async def test_list_titles_sends_country_as_types_query_param() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.params.get_list("types[]") == ["10"]
+        return httpx.Response(200, json={"data": [], "meta": {}})
+
+    async with _client(handler) as client:
+        await client.list_titles(
+            page=1, per_page=30, query=None, genres=None, status=None, country=10, sort="name"
+        )
+
+
+async def test_list_countries_sends_expected_query_params() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/constants"
+        assert request.url.params.get_list("fields[]") == ["types"]
+        return httpx.Response(200, json={"data": {"types": []}})
+
+    async with _client(handler) as client:
+        await client.list_countries()
+
+
+async def test_list_countries_returns_raw_types_array() -> None:
+    types_ = [{"id": 10, "label": "Япония", "site_ids": [3]}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": {"types": types_}})
+
+    async with _client(handler) as client:
+        result = await client.list_countries()
+
+    assert result == types_
+
+
+async def test_list_countries_raises_rate_limit_error_on_429() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, json={"data": {}})
+
+    async with _client(handler) as client:
+        with pytest.raises(RateLimitError):
+            await client.list_countries()
 
 
 async def test_aclose_without_context_manager() -> None:

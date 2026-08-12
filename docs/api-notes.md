@@ -482,6 +482,53 @@ sampled). Same as genres, an unrecognized id (`status[]=99`) is **422** here tho
 selected status.0 is invalid."`) — unlike `genres[]`, this one *is* validated against a
 whitelist server-side, just not one this SDK has catalogued.
 
+**Country/origin filter — `types[]`, not `country`/`countries[]` (issue #48):**
+
+Issue #48 (companion app's catalog filter sidebar needs a country-of-origin filter, same
+motivation as the genre filter in #44) proposed guessing at `country`/`countries[]`
+parameters and a `fields[]=countries` constants endpoint, mirroring `genres`. Checked
+directly, both guesses turned out wrong:
+
+- `GET /api/constants?fields[]=countries` is a real, working, unauthenticated endpoint —
+  but it returns something unrelated to title origin: as of this writing, 3 entries
+  (Беларусь/Казахстан/Россия), each with a `phone_code` and `emoji_unicode` and no
+  `site_ids` field at all. This looks like a phone-country-code list for some account/
+  registration flow elsewhere on the site, not a title metadata concept — the SDK does not
+  use this endpoint.
+- The actual "country a title comes from" concept already exists in every title response,
+  just under a different name: the `type` field (present by default on both
+  `GET /api/manga/{slug}` and `GET /api/manga` catalog listing items, no extra `fields[]`
+  needed — confirmed via a real title, `91443--new-hero-in-dxd`: `"type": {"id": 15,
+  "label": "Фанфик"}`, matching `tests/unit/test_models.py`'s `RAW_TITLE` fixture, which
+  already carried this field unused before this issue). Before this issue, `type` was
+  listed among "extra fields this endpoint sends that `Title` doesn't model" (see below) —
+  that was accurate at the time (nothing consumed it) but incomplete once its actual
+  meaning was understood.
+- The catalog listing filter for it is `types[]=<id>` (repeatable; confirmed OR semantics
+  by combining `types[]=10&types[]=11` → results with either type, unlike `genres[]`'s AND
+  — expected, since a title only ever has one `type`, so OR is the only semantics that make
+  sense). `type_id[]`/`type[]` were tried as alternate names and silently do nothing (same
+  "accepted but ignored" pattern as bare `sort`); unrecognized ids **422**
+  (`"The selected types.0 is invalid."`) — validated server-side, like `status[]`.
+- The listing endpoint for id → label is `GET /api/constants?fields[]=types` (same
+  network-wide, `site_ids`-tagged shape as `fields[]=genres`, see above — not site-scoped by
+  request parameter, filter by `site_ids` containing `3` client-side). As of this writing,
+  6 entries are tagged for ranobelib.me (`site_ids: [3]`): `10` "Япония" (Japan), `11`
+  "Корея" (Korea), `12` "Китай" (China), `13` "Английский" (originally English-language),
+  `14` "Авторский" (original/non-translated web novel), `15` "Фанфик" (fanfiction). The
+  other ~14 entries in the full response are tagged for other lib.social sites (manga/manhwa/
+  manhua-type entries for site 1/2/4, anime episode-format entries for site 5) and excluded
+  the same way `Catalog.list_genres()` excludes non-ranobelib genres.
+- Given three of the six ranobelib values aren't literal countries, the SDK's `Country`
+  model (`id`/`name`, `name` mapped from the API's `label` key) surfaces all six as-is
+  rather than trying to filter down to "real" countries only — see `Country`'s docstring.
+  This is the same kind of naming mismatch as `sort`/`sort_by` and `number_secondary`/team
+  selection elsewhere in this file: the issue's proposed public shape (`Country`,
+  `Title.country`, `list_titles(country=...)`, `Catalog.list_countries()`) is kept because
+  it matches the real use case, but everything under the hood — wire parameter names,
+  constants endpoint, and the fact that this isn't a *pure* country concept — was corrected
+  against what the API actually does, not what the issue guessed.
+
 **Sort — the real parameter is `sort_by`, not `sort` (`sort` is silently accepted and does
 nothing):**
 
@@ -532,8 +579,9 @@ defaults but that this endpoint doesn't send (`genres`, `tags`, `authors`, `arti
 `summary`, `release_date`, `chapter_count`, ...) just come back empty/`None`, same as any other
 optional field — no separate "catalog list item" model needed, matching the issue's explicit
 ask to reuse `Title`. Extra fields this endpoint sends that `Title` doesn't model (`rating`,
-`content_marking`, `type`, `site`, `releaseDateString`) are ignored by pydantic, same as
-everywhere else in the SDK.
+`content_marking`, `site`, `releaseDateString`) are ignored by pydantic, same as everywhere
+else in the SDK. `type` used to be in this list too, until issue #48 (see "Country/origin
+filter" above) — it's now `Title.country`.
 
 ## Open questions
 
