@@ -1,0 +1,66 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      host:
+      - api.cdnlibs.org
+      site-id:
+      - '3'
+      user-agent:
+      - python-httpx/0.28.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/constants?fields%5B%5D=types
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA5yTsW6DQAyGX6W6mUrcnS8Btg7dqrJUWdqoggASUoZKoUOFePcqNq3NwUGbxUKO
+        /dn+81+vqqIrVNar7uujvqjstVdtpbI4UueirM8qU2+fMejqGq3DmGDcYzScB42RMlgPJX6nKlKX
+        tqvf2+o64DhENEN7M05YHXO/tZSZ9usIIvMLAYbkj0/32HATyG1tA05cvIrabaJODIQ/7JZMgSYW
+        jTcdm3obFthSCyD9yZgHvYbSnlVMg52NIFZMhGbKsszx7SB2AjrPbRDMIoHmGiFTGiRYjzCXtRTq
+        pKQOK/WTD/JhkW/EhuLef5E9+xoQ95LnQHCKIEd49+Vwhyhaw/FiI4S+yynKMWq/uFLCMtIzsKcg
+        Idm0RC2km5vY8a9jPcWdqI+D071HMurQCHKyroARTyM/PATLhPPz53DZsr2lIZtZ73EYvgEAAP//
+        AwC9I0YN4wUAAA==
+    headers:
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Wed, 12 Aug 2026 16:01:01 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=OvBMbInVH1HcGvXW; Domain=.cdnlibs.org; Path=/; Expires=Wed, 12-Aug-2026
+        16:21:00 GMT
+      - __ddg10_=1786550460; Domain=.cdnlibs.org; Path=/; Expires=Wed, 12-Aug-2026
+        16:21:00 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Wed, 12-Aug-2026
+        16:21:00 GMT
+      - __ddg1_=w2cgWuRJ4NkHGAJ7sMvc; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Thu,
+        12-Aug-2027 16:01:00 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Origin, Accept-Encoding
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '97'
+    status:
+      code: 200
+      message: OK
+version: 1

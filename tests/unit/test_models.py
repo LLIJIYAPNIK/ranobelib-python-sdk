@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from ranobelib.models import Title
+from ranobelib.models import Country, Title
 
 RAW_TITLE: dict[str, Any] = {
     "id": 91443,
@@ -87,6 +87,7 @@ def test_title_model_validate_maps_aliases_and_nested_models() -> None:
     assert title.tags[0].name == "Богиня"
     assert title.authors[0].name == "kingCH"
     assert title.artists == []
+    assert title.country == Country(id=15, name="Фанфик")
 
 
 def test_title_model_parses_prosemirror_summary_to_text() -> None:
@@ -142,3 +143,17 @@ def test_title_model_handles_missing_optional_fields() -> None:
     assert title.chapter_count is None
     assert title.other_names == []
     assert title.genres == []
+    assert title.country is None
+
+
+def test_country_maps_label_to_name() -> None:
+    country = Country.model_validate({"id": 10, "label": "Япония"})
+
+    assert country.id == 10
+    assert country.name == "Япония"
+
+
+def test_country_accepts_name_by_field_name_too() -> None:
+    country = Country(id=10, name="Япония")
+
+    assert country.name == "Япония"

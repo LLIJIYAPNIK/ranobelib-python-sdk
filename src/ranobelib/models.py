@@ -206,6 +206,25 @@ class Tag(BaseModel):
     adult: bool = False
 
 
+class Country(BaseModel):
+    """A title's country/region of origin.
+
+    Despite the name (matching issue #48's requested public shape), this maps onto what the
+    raw API itself calls "type" (`Title`'s raw `type` field; the catalog filter's `types[]`
+    parameter; `GET /api/constants?fields[]=types`) — not a `country`/`countries[]`/
+    `fields[]=countries` concept, which turned out to be something unrelated (see
+    docs/api-notes.md). For ranobelib.me specifically, the values are three literal
+    countries (Japan, Korea, China) plus three additional non-national origin categories the
+    site groups the same way: original English-language work, original (non-translated) web
+    novel, and fanfiction — surfaced as-is, not filtered down to "real" countries only.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: int
+    name: str = Field(alias="label")
+
+
 class Person(BaseModel):
     """An author or artist credited on a title."""
 
@@ -243,6 +262,7 @@ class Title(BaseModel):
     summary: str | None = None
     release_date: str | None = Field(default=None, alias="releaseDate")
     is_licensed: bool = False
+    country: Country | None = Field(default=None, alias="type")
     genres: list[Genre] = Field(default_factory=list)
     tags: list[Tag] = Field(default_factory=list)
     authors: list[Person] = Field(default_factory=list)

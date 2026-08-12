@@ -1,7 +1,7 @@
 """Unit tests for ranobelib.catalog helpers (no network)."""
 
-from ranobelib.catalog import _build_genres, _build_page, _cache_key
-from ranobelib.models import CatalogPage, Genre, Title
+from ranobelib.catalog import _build_countries, _build_genres, _build_page, _cache_key
+from ranobelib.models import CatalogPage, Country, Genre, Title
 
 _TITLE_ITEM = {
     "id": 1,
@@ -38,30 +38,45 @@ def test_build_page_handles_empty_results() -> None:
 
 
 def test_cache_key_differs_by_page() -> None:
-    key1 = _cache_key(page=1, per_page=30, query=None, genres=None, status=None, sort="name")
-    key2 = _cache_key(page=2, per_page=30, query=None, genres=None, status=None, sort="name")
+    key1 = _cache_key(
+        page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
+    )
+    key2 = _cache_key(
+        page=2, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
+    )
 
     assert key1 != key2
 
 
-def test_cache_key_differs_by_query_genres_status_and_sort() -> None:
-    base = _cache_key(page=1, per_page=30, query=None, genres=None, status=None, sort="name")
+def test_cache_key_differs_by_query_genres_status_country_and_sort() -> None:
+    base = _cache_key(
+        page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="name"
+    )
 
     assert base != _cache_key(
-        page=1, per_page=30, query="dxd", genres=None, status=None, sort="name"
+        page=1, per_page=30, query="dxd", genres=None, status=None, country=None, sort="name"
     )
     assert base != _cache_key(
-        page=1, per_page=30, query=None, genres=[34], status=None, sort="name"
+        page=1, per_page=30, query=None, genres=[34], status=None, country=None, sort="name"
     )
-    assert base != _cache_key(page=1, per_page=30, query=None, genres=None, status=1, sort="name")
     assert base != _cache_key(
-        page=1, per_page=30, query=None, genres=None, status=None, sort="views"
+        page=1, per_page=30, query=None, genres=None, status=1, country=None, sort="name"
+    )
+    assert base != _cache_key(
+        page=1, per_page=30, query=None, genres=None, status=None, country=10, sort="name"
+    )
+    assert base != _cache_key(
+        page=1, per_page=30, query=None, genres=None, status=None, country=None, sort="views"
     )
 
 
 def test_cache_key_stable_for_equivalent_calls() -> None:
-    key1 = _cache_key(page=1, per_page=30, query="dxd", genres=[1, 2], status=1, sort="name")
-    key2 = _cache_key(page=1, per_page=30, query="dxd", genres=[1, 2], status=1, sort="name")
+    key1 = _cache_key(
+        page=1, per_page=30, query="dxd", genres=[1, 2], status=1, country=10, sort="name"
+    )
+    key2 = _cache_key(
+        page=1, per_page=30, query="dxd", genres=[1, 2], status=1, country=10, sort="name"
+    )
 
     assert key1 == key2
 
@@ -87,3 +102,26 @@ def test_build_genres_drops_genres_not_tagged_for_ranobelib() -> None:
 
 def test_build_genres_handles_empty_results() -> None:
     assert _build_genres([]) == []
+
+
+def test_build_countries_validates_items_as_country() -> None:
+    data = [{"id": 10, "label": "Япония", "site_ids": [3]}]
+
+    countries = _build_countries(data)
+
+    assert countries == [Country(id=10, name="Япония")]
+
+
+def test_build_countries_drops_countries_not_tagged_for_ranobelib() -> None:
+    data = [
+        {"id": 10, "label": "Япония", "site_ids": [3]},
+        {"id": 1, "label": "Манга", "site_ids": [1, 2, 4]},
+    ]
+
+    countries = _build_countries(data)
+
+    assert [country.id for country in countries] == [10]
+
+
+def test_build_countries_handles_empty_results() -> None:
+    assert _build_countries([]) == []

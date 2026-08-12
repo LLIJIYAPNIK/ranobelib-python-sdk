@@ -20,6 +20,8 @@
 
 ::: ranobelib.Genre
 
+::: ranobelib.Country
+
 ## Exceptions
 
 ::: ranobelib.RanobeLibError

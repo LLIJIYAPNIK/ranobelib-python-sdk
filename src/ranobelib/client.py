@@ -171,6 +171,7 @@ class ApiClient:
         query: str | None,
         genres: list[int] | None,
         status: int | None,
+        country: int | None,
         sort: str,
     ) -> dict[str, Any]:
         """Fetch one page of the catalog listing/search results.
@@ -188,6 +189,9 @@ class ApiClient:
             genres: Genre ids to filter by. A title must have *all* of them (AND, not OR —
                 see docs/api-notes.md), not just any one.
             status: A single ``Title.status.id`` to filter by.
+            country: A single ``Country.id`` to filter by. Sent on the wire as ``types[]``
+                (repeatable array parameter, but only ever given one value here) — the API's
+                own name for this concept is "type", not "country" (see docs/api-notes.md).
             sort: Forwarded as the API's ``sort_by`` parameter, not ``sort`` — the API
                 silently ignores an actual ``sort`` parameter (see docs/api-notes.md); this
                 mismatch between the SDK's public keyword and the wire parameter name is
@@ -208,6 +212,8 @@ class ApiClient:
             params.append(("genres[]", str(genre_id)))
         if status is not None:
             params.append(("status[]", str(status)))
+        if country is not None:
+            params.append(("types[]", str(country)))
 
         response = await self._get("/manga", params=httpx.QueryParams(params))
         self._raise_for_status(
@@ -233,6 +239,23 @@ class ApiClient:
         response = await self._get("/constants", params=httpx.QueryParams([("fields[]", "genres")]))
         self._raise_for_status(response, not_found=RanobeLibError("Unexpected 404 from genre list"))
         data: list[dict[str, Any]] = response.json()["data"]["genres"]
+        return data
+
+    async def list_countries(self) -> list[dict[str, Any]]:
+        """Fetch the raw country/type list shared across the whole lib.social network.
+
+        Same shape and caveats as ``list_genres``: not site-scoped by any request parameter,
+        returns every "type" known to the network at once, each tagged with the site ids it
+        applies to via ``site_ids``. Named ``list_countries``/``fields[]=types`` mismatch is
+        deliberate — see ``Catalog.list_countries`` and docs/api-notes.md for why this reuses
+        the API's own "type" concept rather than the unrelated ``fields[]=countries`` field.
+
+        Returns:
+            The raw ``data.types`` array from the API response, unfiltered by site.
+        """
+        response = await self._get("/constants", params=httpx.QueryParams([("fields[]", "types")]))
+        self._raise_for_status(response, not_found=RanobeLibError("Unexpected 404 from type list"))
+        data: list[dict[str, Any]] = response.json()["data"]["types"]
         return data
 
     async def _get(self, url: str, *, params: Any = None) -> httpx.Response:
