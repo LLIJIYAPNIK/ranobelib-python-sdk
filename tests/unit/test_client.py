@@ -176,7 +176,7 @@ async def test_list_titles_sends_expected_query_params() -> None:
         assert request.url.params.get_list("genres[]") == ["34", "35"]
         assert request.url.params.get_list("tags[]") == ["218", "232"]
         assert request.url.params.get_list("status[]") == ["1"]
-        assert request.url.params.get_list("types[]") == ["10"]
+        assert request.url.params.get_list("types[]") == ["10", "11"]
         return httpx.Response(200, json={"data": [], "meta": {}})
 
     async with _client(handler) as client:
@@ -187,7 +187,7 @@ async def test_list_titles_sends_expected_query_params() -> None:
             genres=[34, 35],
             tags=[218, 232],
             status=1,
-            country=10,
+            countries=[10, 11],
             sort="last_chapter_at",
         )
 
@@ -209,7 +209,7 @@ async def test_list_titles_omits_optional_params_when_not_given() -> None:
             genres=None,
             tags=None,
             status=None,
-            country=None,
+            countries=None,
             sort="name",
         )
 
@@ -228,7 +228,7 @@ async def test_list_titles_returns_full_response_body() -> None:
             genres=None,
             tags=None,
             status=None,
-            country=None,
+            countries=None,
             sort="name",
         )
 
@@ -248,7 +248,7 @@ async def test_list_titles_raises_rate_limit_error_on_429() -> None:
                 genres=None,
                 tags=None,
                 status=None,
-                country=None,
+                countries=None,
                 sort="name",
             )
 
@@ -266,7 +266,7 @@ async def test_list_titles_wraps_validation_error_in_ranobelib_error() -> None:
                 genres=None,
                 tags=None,
                 status=None,
-                country=None,
+                countries=None,
                 sort="bogus",
             )
 
@@ -302,9 +302,9 @@ async def test_list_genres_raises_rate_limit_error_on_429() -> None:
             await client.list_genres()
 
 
-async def test_list_titles_sends_country_as_types_query_param() -> None:
+async def test_list_titles_sends_countries_as_repeated_types_query_param() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        assert request.url.params.get_list("types[]") == ["10"]
+        assert request.url.params.get_list("types[]") == ["10", "11"]
         return httpx.Response(200, json={"data": [], "meta": {}})
 
     async with _client(handler) as client:
@@ -315,7 +315,7 @@ async def test_list_titles_sends_country_as_types_query_param() -> None:
             genres=None,
             tags=None,
             status=None,
-            country=10,
+            countries=[10, 11],
             sort="name",
         )
 
@@ -333,7 +333,7 @@ async def test_list_titles_sends_tags_query_param() -> None:
             genres=None,
             tags=[218],
             status=None,
-            country=None,
+            countries=None,
             sort="name",
         )
 

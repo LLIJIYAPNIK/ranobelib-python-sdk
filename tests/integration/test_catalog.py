@@ -38,12 +38,24 @@ async def test_list_titles_filters_by_status() -> None:
 @pytest.mark.vcr
 async def test_list_titles_filters_by_country() -> None:
     async with Catalog() as catalog:
-        # 11 = Korea (see docs/api-notes.md, "Country/origin filter") — a title only has
-        # one country, so this doesn't need the list-of-ids shape `genres` uses.
-        page = await catalog.list_titles(country=11, per_page=10)
+        # 11 = Korea (see docs/api-notes.md, "Country/origin filter").
+        page = await catalog.list_titles(countries=[11], per_page=10)
 
     assert page.items
     assert all(item.country is not None and item.country.id == 11 for item in page.items)
+
+
+@pytest.mark.vcr
+async def test_list_titles_countries_filter_uses_or_not_and_semantics() -> None:
+    async with Catalog() as catalog:
+        # 10 = Japan, 11 = Korea (see docs/api-notes.md, "Country/origin filter"). Unlike
+        # `genres`/`tags`, this is OR, not AND — a title only ever has one country, so
+        # requiring all of the given ids could never match past the first one. Confirmed by
+        # checking both ids show up in the combined results, not just one.
+        page = await catalog.list_titles(countries=[10, 11], per_page=60, sort="name")
+
+    country_ids = {item.country.id for item in page.items if item.country is not None}
+    assert country_ids == {10, 11}
 
 
 @pytest.mark.vcr
@@ -185,8 +197,9 @@ async def test_list_countries_returns_countries_with_id_and_name() -> None:
     assert countries
     assert all(isinstance(country, Country) for country in countries)
     assert all(country.id and country.name for country in countries)
-    # Id 11 is used elsewhere in this test suite as a `list_titles(country=11)` filter value
-    # (see test_list_titles_filters_by_country) — confirm it resolves to "Корея" (Korea) here.
+    # Id 11 is used elsewhere in this test suite as a `list_titles(countries=[11])` filter
+    # value (see test_list_titles_filters_by_country) — confirm it resolves to "Корея" (Korea)
+    # here.
     assert any(country.id == 11 and country.name == "Корея" for country in countries)
 
 

@@ -46,7 +46,7 @@ async def main() -> None:
         for title in completed_page.items[:5]:
             print(f"  {title.id}: {title.name}")
 
-        # `list_countries()` is the id -> name lookup for the `country` filter below, same
+        # `list_countries()` is the id -> name lookup for the `countries` filter below, same
         # pattern as `list_genres()` above (network-wide constants endpoint, filtered down to
         # ranobelib.me by Catalog). Despite the name, this covers more than literal countries
         # for ranobelib.me specifically — three real countries (Japan/Korea/China) plus three
@@ -55,14 +55,26 @@ async def main() -> None:
         countries = await catalog.list_countries()
         print(f"\n{len(countries)} countries available: {[country.name for country in countries]}")
         korea = next(country for country in countries if country.name == "Корея")
+        japan = next(country for country in countries if country.name == "Япония")
 
-        # `country` takes a single id, unlike `genres` — a title only has one country of
-        # origin. Every returned Title's `.country` reflects it (also populated on
-        # RanobeLib.get_info() results, since it's the same model field).
-        korean_page = await catalog.list_titles(country=korea.id, per_page=10)
+        # `countries` takes a list of ids, same shape as `genres`/`tags`, but with OR (not
+        # AND) semantics — a title only ever has one country of origin, so it matches if that
+        # country is *any* of the given ids, not all of them (requiring all would never match
+        # past the first id). Every returned Title's `.country` reflects it (also populated on
+        # RanobeLib.get_info() results, since it's the same model field). A single id still
+        # works as a one-element list, e.g. `countries=[korea.id]`.
+        korean_page = await catalog.list_titles(countries=[korea.id], per_page=10)
         print(f"\n5 titles from {korea.name}:")
         for title in korean_page.items[:5]:
             print(f"  {title.id}: {title.name}")
+
+        jp_or_kr_page = await catalog.list_titles(
+            countries=[japan.id, korea.id], per_page=10, sort="name"
+        )
+        print(f"\n5 titles from {japan.name} or {korea.name} (mixed):")
+        for title in jp_or_kr_page.items[:5]:
+            origin = title.country.name if title.country else "?"
+            print(f"  {title.id}: {title.name} ({origin})")
 
         # `tags` filters the same way `genres` does (AND semantics — a title must have
         # *all* given tag ids, confirmed against the live API even though tags are more
@@ -99,35 +111,42 @@ asyncio.run(main())
 # 54 genres available, e.g.: ['Арт', 'Безумие', 'Боевик', 'Боевые искусства', 'Вампиры']
 #
 # 5 'Боевик' titles:
-#   135591: Reaper of the Drifting Moon (Novel)
-#   227705: Shepherd Wizard
-#   43981: Metcha shōkan sa reta kudan (Novel)
-#   166389: Già Thiên
-#   243244: Yǐ yī lóng zhī lì dǎdǎo zhěnggè shìjiè!
+#   271317: Isegye Geomeun Meori Oegugin
+#   268176: baedeu ending meikeo
+#   25089: Jaeang-geub yeong-ungnim-i gwihwanhasyeossda
+#   251723: I found a dragon egg
+#   237642: Mòshì tiānzāi: Cóng dǎzào bìnàn suǒ kāishǐ
 #
 # 10 completed titles on page 1:
-#   270852: Heonteo Yeogo-ui Namseonsaeng
-#   135591: Reaper of the Drifting Moon (Novel)
-#   227705: Shepherd Wizard
-#   18802: Xiu Zhen Liao Tian Qun
-#   166389: Già Thiên
+#   244924: guwon, geu janhogham-e daehayeo
+#   271058: Kuàichuān gōnglüè: Yāoniè sùzhǔ, kāiguà le
+#   57693: don-eulo yaghonjaleul
+#   271317: Isegye Geomeun Meori Oegugin
+#   268176: baedeu ending meikeo
 #
 # 6 countries available: ['Япония', 'Корея', 'Китай', 'Английский', 'Авторский', 'Фанфик']
 #
 # 5 titles from Корея:
-#   227705: Shepherd Wizard
-#   135591: Reaper of the Drifting Moon (Novel)
-#   214246: gwedame tteoreojyeodo chulgeuneul haeya haneunguna
-#   40022: agdang daegongnim-ui gwihadigwihan yeodongsaeng
-#   268050: I'll Become the Academy Gacha Villain
+#   244924: guwon, geu janhogham-e daehayeo
+#   57693: don-eulo yaghonjaleul
+#   49961: Geumbal-ui jeonglyeongs
+#   267643: lopan sog haegunjedog-i doeeossda
+#   271317: Isegye Geomeun Meori Oegugin
+#
+# 5 titles from Япония or Корея (mixed):
+#   16498: 잔여 포인트 999999999999P (Novel) (Корея)
+#   214726: ■■ eul wihan segyeneun eobsda (Корея)
+#   227524: √4: Uchi no Juunin wa Minna Ijou desu (Япония)
+#   55978: Я получил читерные способности в другом мире и стал экстраординарным в реальном~
+#   повышение уровня изменило мою жизнь~ (Novel) (Япония)
+#   231169: Я не ищу связей на одну ночь (Новелла) (Корея)
 #
 # 10 'Боги' titles on page 1:
-#   6720: Tondemo Skill de Isekai Hourou Meshi (WN)
-#   243244: Yǐ yī lóng zhī lì dǎdǎo zhěnggè shìjiè!
 #   271058: Kuàichuān gōnglüè: Yāoniè sùzhǔ, kāiguà le
-#   227705: Shepherd Wizard
-#   265281: Harem System In A fantasy World
+#   267643: lopan sog haegunjedog-i doeeossda
+#   25089: Jaeang-geub yeong-ungnim-i gwihwanhasyeossda
+#   232975: Jiuri zhi lu
+#   270776: Yongsapati Beorimbadeun Saje
 #
-# 5 newest titles: ['Chwimi Bangsongimnida', 'Ropan Sok Choijongboseuneun Deo Isang Chamji
-# Anneunda', 'domangchin agonganeuro EX-ga Jjotawatta', 'Kimi wa Boku no Regret', 'Ani,
-# jeoneun hwangnyeonimman kkosyeotdanikkayo?']
+# 5 newest titles: ['Salajin sindelella', 'Warden of the Mysteries', 'In all his overwhelming
+# tenacity', 'Ekseuteoui 2hoechaneun Goemul Baeuda', 'Avatar: The Rise of Kyoshi']

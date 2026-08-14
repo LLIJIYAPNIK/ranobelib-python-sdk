@@ -601,6 +601,23 @@ directly, both guesses turned out wrong:
   constants endpoint, and the fact that this isn't a *pure* country concept — was corrected
   against what the API actually does, not what the issue guessed.
 
+**Widened to accept multiple countries — `countries: list[int]`, OR semantics (issue #55):**
+
+`list_titles(country=...)` originally only accepted a single id (previous paragraph),
+matching "a title only has one country" — but that's a fact about what a title *has*, not
+about what a filter UI needs to *select*, and issue #55 (companion app's catalog filters
+moving country from radio buttons to checkboxes) asked for the same list-of-ids shape
+`genres`/`tags` already have. The OR semantics of repeated `types[]` were already confirmed
+during #48's investigation (bullet above: `types[]=10&types[]=11` → results with either
+type) but the public API only ever sent one value. Re-confirmed directly for this issue with
+a larger sample (`types[]=10&types[]=11&limit=60&sort_by=name`): the 60 results include both
+type `10` and type `11` titles, not just one — real OR, not "last one wins" or silently
+ignored like a bare `sort`. `Catalog.list_titles()`'s `country: int | None` parameter was
+replaced outright with `countries: list[int] | None` (not kept alongside it — the issue left
+this open, but the project doesn't keep unused parallel parameters, see CLAUDE.md); `None` or
+an empty list omits `types[]` entirely, same as `genres`/`tags` already do for their own
+list parameters.
+
 **Sort — the real parameter is `sort_by`, not `sort` (`sort` is silently accepted and does
 nothing):**
 
