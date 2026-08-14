@@ -172,7 +172,7 @@ class ApiClient:
         genres: list[int] | None,
         tags: list[int] | None,
         status: int | None,
-        country: int | None,
+        countries: list[int] | None,
         sort: str,
     ) -> dict[str, Any]:
         """Fetch one page of the catalog listing/search results.
@@ -192,9 +192,11 @@ class ApiClient:
             tags: Tag ids to filter by. Same AND semantics as ``genres`` — a title must have
                 *all* of them, not just any one (see docs/api-notes.md).
             status: A single ``Title.status.id`` to filter by.
-            country: A single ``Country.id`` to filter by. Sent on the wire as ``types[]``
-                (repeatable array parameter, but only ever given one value here) — the API's
-                own name for this concept is "type", not "country" (see docs/api-notes.md).
+            countries: ``Country.id``s to filter by. A title matches if its own country is
+                *any* of these (OR, not AND like ``genres``/``tags`` — a title only has one
+                country, confirmed against the live API, see docs/api-notes.md). Sent on the
+                wire as repeated ``types[]`` parameters — the API's own name for this concept
+                is "type", not "country" (see docs/api-notes.md).
             sort: Forwarded as the API's ``sort_by`` parameter, not ``sort`` — the API
                 silently ignores an actual ``sort`` parameter (see docs/api-notes.md); this
                 mismatch between the SDK's public keyword and the wire parameter name is
@@ -217,8 +219,8 @@ class ApiClient:
             params.append(("tags[]", str(tag_id)))
         if status is not None:
             params.append(("status[]", str(status)))
-        if country is not None:
-            params.append(("types[]", str(country)))
+        for country_id in countries or []:
+            params.append(("types[]", str(country_id)))
 
         response = await self._get("/manga", params=httpx.QueryParams(params))
         self._raise_for_status(

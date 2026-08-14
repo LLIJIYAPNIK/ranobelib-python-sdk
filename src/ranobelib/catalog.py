@@ -81,7 +81,7 @@ class Catalog:
         genres: list[int] | None = None,
         tags: list[int] | None = None,
         status: int | None = None,
-        country: int | None = None,
+        countries: list[int] | None = None,
         sort: str = DEFAULT_SORT,
         refresh: bool = False,
     ) -> CatalogPage:
@@ -104,11 +104,14 @@ class Catalog:
                 from tags being more numerous/specific than genres). Also not validated
                 before sending, same as ``genres``.
             status: A single ``Title.status.id`` to filter by (e.g. ongoing vs. completed).
-            country: A single ``Country.id`` to filter by — a title only has one country of
-                origin, unlike ``genres``. Ids come from ``list_countries()``. Sent on the
-                wire as the API's ``types[]`` parameter, not a ``country``/``countries[]``
-                one — see docs/api-notes.md for why (``Country`` mirrors the API's own
-                "type" concept, which isn't strictly limited to literal countries).
+            countries: ``Country.id``s to filter by. A title matches if its own country is
+                *any* of these (OR, not AND like ``genres``/``tags`` — a title only has one
+                country of origin, so requiring all of them could never match past the first,
+                see docs/api-notes.md). ``None`` or an empty list applies no country filter.
+                Ids come from ``list_countries()``. Sent on the wire as the API's ``types[]``
+                parameter, not a ``country``/``countries[]`` one — see docs/api-notes.md for
+                why (``Country`` mirrors the API's own "type" concept, which isn't strictly
+                limited to literal countries).
             sort: Sort order. Despite the name, this is sent as the API's ``sort_by``
                 parameter — an actual ``sort`` parameter exists but is silently ignored by
                 the API (see docs/api-notes.md). Known accepted values: ``"name"``,
@@ -140,7 +143,7 @@ class Catalog:
             genres=genres,
             tags=tags,
             status=status,
-            country=country,
+            countries=countries,
             sort=sort,
         )
         if not refresh:
@@ -155,7 +158,7 @@ class Catalog:
             genres=genres,
             tags=tags,
             status=status,
-            country=country,
+            countries=countries,
             sort=sort,
         )
         self._cache.set(key, data)
@@ -191,7 +194,7 @@ class Catalog:
 
     async def list_countries(self, *, refresh: bool = False) -> list[Country]:
         """Fetch the full list of catalog countries (id → name), for use as filter options
-        with ``list_titles(country=...)``.
+        with ``list_titles(countries=...)``.
 
         Mirrors ``list_genres()`` exactly, down to the network-wide, not-site-scoped shape
         of the underlying endpoint (``GET /api/constants?fields[]=types`` — the API's own
@@ -225,14 +228,15 @@ def _cache_key(
     genres: list[int] | None,
     tags: list[int] | None,
     status: int | None,
-    country: int | None,
+    countries: list[int] | None,
     sort: str,
 ) -> str:
     genres_part = ",".join(str(genre_id) for genre_id in genres or [])
     tags_part = ",".join(str(tag_id) for tag_id in tags or [])
+    countries_part = ",".join(str(country_id) for country_id in countries or [])
     return (
         f"catalog:{page}:{per_page}:{query or ''}:{genres_part}:{tags_part}:"
-        f"{status}:{country}:{sort}"
+        f"{status}:{countries_part}:{sort}"
     )
 
 
