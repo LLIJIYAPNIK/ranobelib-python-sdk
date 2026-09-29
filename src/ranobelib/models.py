@@ -67,31 +67,73 @@ def _render_prosemirror_inline(node: dict[str, Any], attachments: list[dict[str,
     return "".join(_render_prosemirror_inline(child, attachments) for child in _child_nodes(node))
 
 
-def _render_prosemirror_block(node: dict[str, Any], attachments: list[dict[str, Any]]) -> str:
+_FOOTNOTE_ARROW = "↑"
+"""The "↑" a translator footnote paragraph starts with — see ``Chapter.footnotes``."""
+
+
+def _strip_footnote_arrow(paragraph: dict[str, Any]) -> dict[str, Any] | None:
+    """Return ``paragraph`` without its leading ``_FOOTNOTE_ARROW``, or ``None`` if its first
+    non-blank text doesn't start with one (i.e. it's a regular paragraph, not a footnote).
+
+    Non-text children (an image, a hard break) before that text are kept and skipped over,
+    same as ``_ContentSanitizer`` does for the HTML-string format.
+    """
+    children = _child_nodes(paragraph)
+    for index, child in enumerate(children):
+        if child.get("type") != "text":
+            continue
+        text = str(child.get("text", "")).lstrip()
+        if not text:
+            continue
+        if not text.startswith(_FOOTNOTE_ARROW):
+            return None
+        stripped = {**child, "text": text[len(_FOOTNOTE_ARROW) :].lstrip()}
+        return {**paragraph, "content": [*children[:index], stripped, *children[index + 1 :]]}
+    return None
+
+
+def _render_prosemirror_block(
+    node: dict[str, Any], attachments: list[dict[str, Any]], footnotes: list[str]
+) -> str:
     node_type = node.get("type")
     if node_type == "paragraph":
+        footnote = _strip_footnote_arrow(node)
+        paragraph = footnote if footnote is not None else node
         inner = "".join(
-            _render_prosemirror_inline(child, attachments) for child in _child_nodes(node)
+            _render_prosemirror_inline(child, attachments) for child in _child_nodes(paragraph)
         )
-        return f"<p>{inner}</p>"
+        if footnote is None:
+            return f"<p>{inner}</p>"
+        if inner.strip():
+            footnotes.append(inner.strip())
+        return ""
     if node_type == "image":
         return _render_prosemirror_inline(node, attachments)
     if node_type == "horizontalRule":
         return "<hr />"
-    return "".join(_render_prosemirror_block(child, attachments) for child in _child_nodes(node))
+    return "".join(
+        _render_prosemirror_block(child, attachments, footnotes) for child in _child_nodes(node)
+    )
 
 
-def _prosemirror_to_html(doc: dict[str, Any], attachments: list[dict[str, Any]]) -> str:
-    """Render a prosemirror-doc JSON structure as an HTML fragment.
+def _prosemirror_to_html(
+    doc: dict[str, Any], attachments: list[dict[str, Any]]
+) -> tuple[str, list[str]]:
+    """Render a prosemirror-doc JSON structure as an HTML fragment, plus its footnotes.
 
     Chapter content comes from the API in one of two formats — an HTML string, or
     prosemirror-doc JSON (see docs/api-notes.md) — this makes the latter match the tag
     vocabulary (``p``/``img``/``strong``/``em``) the former already uses natively, so
     downstream consumers (exporters) only ever handle one shape. Image nodes reference
     attachments by an opaque id, resolved against the chapter response's ``attachments``
-    array.
+    array. Footnote paragraphs (see ``Chapter.footnotes``) are left out of the returned HTML
+    and returned separately instead, as inline HTML fragments without the leading arrow.
     """
-    return "".join(_render_prosemirror_block(block, attachments) for block in _child_nodes(doc))
+    footnotes: list[str] = []
+    rendered = "".join(
+        _render_prosemirror_block(block, attachments, footnotes) for block in _child_nodes(doc)
+    )
+    return rendered, footnotes
 
 
 _ALLOWED_CONTENT_TAGS = frozenset({"p", "img", "strong", "em", "br", "hr"})
@@ -99,6 +141,20 @@ _CONTENT_TAG_ALIASES = {"b": "strong", "i": "em"}
 _VOID_CONTENT_TAGS = frozenset({"br", "hr", "img"})
 _DROPPED_CONTENT_TEXT_TAGS = frozenset({"script", "style"})
 _SAFE_IMG_SCHEMES = frozenset({"http", "https"})
+
+
+_FOOTNOTE_BLOCK_TAGS = frozenset({"p", "li"})
+
+
+class _Block:
+    """A ``p``/``li`` still being parsed — buffered, since whether it's a footnote (see
+    ``Chapter.footnotes``) is only known once its first non-blank text arrives."""
+
+    def __init__(self, tag: str) -> None:
+        self.tag = tag
+        self.parts: list[str] = []
+        self.seen_text = False
+        self.is_footnote = False
 
 
 class _ContentSanitizer(HTMLParser):
@@ -116,20 +172,54 @@ class _ContentSanitizer(HTMLParser):
     safety concern. Text inside a dropped ``script``/``style`` tag is discarded rather than
     kept as escaped text — anywhere else, a dropped tag's text content is kept (e.g. a
     stripped ``<a href="...">text</a>`` still leaves ``text`` behind).
+
+    A ``p`` or ``li`` whose first non-blank text starts with ``_FOOTNOTE_ARROW`` is a
+    translator footnote: it's collected into ``footnotes`` (sanitized inner HTML, arrow
+    stripped) instead of the output. ``li`` is otherwise still dropped like any other tag
+    outside the vocabulary (its text kept) — footnotes are the one case it's recognized for.
     """
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self._output: list[str] = []
+        self._blocks: list[_Block] = []
         self._skip_text_depth = 0
+        self.footnotes: list[str] = []
+
+    def _out(self) -> list[str]:
+        return self._blocks[-1].parts if self._blocks else self._output
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        self._emit(tag, attrs, self_closing=False)
+        if tag in _FOOTNOTE_BLOCK_TAGS:
+            self._open_block(tag)
+        else:
+            self._emit(tag, attrs)
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        self._emit(tag, attrs, self_closing=True)
+        if tag in _FOOTNOTE_BLOCK_TAGS:
+            self._open_block(tag)
+            self._close_block()
+        else:
+            self._emit(tag, attrs)
 
-    def _emit(self, tag: str, attrs: list[tuple[str, str | None]], *, self_closing: bool) -> None:
+    def _open_block(self, tag: str) -> None:
+        # Same implicit close HTML itself does: a new <p> ends an open <p>, <li> an open <li>.
+        if self._blocks and self._blocks[-1].tag == tag:
+            self._close_block()
+        self._blocks.append(_Block(tag))
+
+    def _close_block(self) -> None:
+        block = self._blocks.pop()
+        inner = "".join(block.parts)
+        if block.is_footnote:
+            if inner.strip():
+                self.footnotes.append(inner.strip())
+        elif block.tag == "p":
+            self._out().append(f"<p>{inner}</p>")
+        else:
+            self._out().append(inner)
+
+    def _emit(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         resolved = _CONTENT_TAG_ALIASES.get(tag, tag)
         if resolved not in _ALLOWED_CONTENT_TAGS:
             if tag in _DROPPED_CONTENT_TEXT_TAGS:
@@ -138,40 +228,60 @@ class _ContentSanitizer(HTMLParser):
         if resolved == "img":
             src = dict(attrs).get("src")
             if src and urlsplit(src).scheme in _SAFE_IMG_SCHEMES:
-                self._output.append(f'<img loading="lazy" src="{html.escape(src, quote=True)}" />')
+                self._out().append(f'<img loading="lazy" src="{html.escape(src, quote=True)}" />')
             return
         if resolved in _VOID_CONTENT_TAGS:
-            self._output.append(f"<{resolved} />")
+            self._out().append(f"<{resolved} />")
         else:
-            self._output.append(f"<{resolved}>")
+            self._out().append(f"<{resolved}>")
 
     def handle_endtag(self, tag: str) -> None:
+        if tag in _FOOTNOTE_BLOCK_TAGS:
+            # Close up to the matching open block; a stray end tag with none open is dropped.
+            if any(block.tag == tag for block in self._blocks):
+                while self._blocks[-1].tag != tag:
+                    self._close_block()
+                self._close_block()
+            return
         resolved = _CONTENT_TAG_ALIASES.get(tag, tag)
         if resolved not in _ALLOWED_CONTENT_TAGS:
             if tag in _DROPPED_CONTENT_TEXT_TAGS and self._skip_text_depth > 0:
                 self._skip_text_depth -= 1
             return
         if resolved not in _VOID_CONTENT_TAGS:
-            self._output.append(f"</{resolved}>")
+            self._out().append(f"</{resolved}>")
 
     def handle_data(self, data: str) -> None:
-        if self._skip_text_depth == 0:
-            self._output.append(html.escape(data))
+        if self._skip_text_depth > 0:
+            return
+        if self._blocks and not self._blocks[-1].seen_text:
+            block = self._blocks[-1]
+            stripped = data.lstrip()
+            if stripped:
+                block.seen_text = True
+                if stripped.startswith(_FOOTNOTE_ARROW):
+                    block.is_footnote = True
+                    data = stripped[len(_FOOTNOTE_ARROW) :].lstrip()
+        self._out().append(html.escape(data))
 
     def get_html(self) -> str:
+        while self._blocks:
+            self._close_block()
         return "".join(self._output)
 
 
-def _sanitize_content_html(content: str) -> str:
+def _sanitize_content_html(content: str) -> tuple[str, list[str]]:
     """Sanitize an HTML-string-format chapter body down to the restricted tag vocabulary.
 
     Counterpart to ``_prosemirror_to_html`` for the other content format the API returns
     (see docs/api-notes.md) — without this, ``Chapter.content`` would only actually be safe
     to render as raw HTML for prosemirror-sourced chapters, not HTML-string-sourced ones.
+    Returns the sanitized HTML and, separately, the footnotes taken out of it (see
+    ``Chapter.footnotes``).
     """
     sanitizer = _ContentSanitizer()
     sanitizer.feed(content)
-    return sanitizer.get_html()
+    return sanitizer.get_html(), sanitizer.footnotes
 
 
 class Cover(BaseModel):
@@ -310,6 +420,22 @@ class ChapterBranch(BaseModel):
     user: ChapterUser
 
 
+class Footnote(BaseModel):
+    """A translator footnote (term explanation, translation note) taken out of a chapter.
+
+    The API has no structured footnotes (see docs/api-notes.md): they're ordinary
+    paragraphs/list items whose text starts with ``↑``, so that arrow is what the SDK detects
+    them by — and strips from ``content``. There's no ``marker`` linking a footnote back to a
+    point in the text: translators mark the reference with an unnumbered ``*`` at best, which
+    the text also uses for scene breaks and censored words, so ``Chapter.footnotes``'s order
+    (the order they appear in the source) is the only link there is.
+    """
+
+    content: str
+    """Sanitized inline HTML (same tag vocabulary as ``Chapter.content``), without the arrow
+    and without a wrapping ``<p>``."""
+
+
 class Chapter(BaseModel):
     """A chapter: volume, number, name, available translations, and optionally its content.
 
@@ -318,6 +444,10 @@ class Chapter(BaseModel):
     ``Chapter`` instead comes from fetching a single chapter's content, which has a
     different response shape (see docs/api-notes.md). ``content`` is the reverse: only
     populated by the single-chapter endpoint.
+
+    ``footnotes`` holds the chapter's translator footnotes (see ``Footnote``), which are
+    removed from ``content`` rather than kept in both places — empty when the chapter has
+    none, or when ``content`` isn't fetched.
     """
 
     id: int
@@ -330,6 +460,7 @@ class Chapter(BaseModel):
     branches: list[ChapterBranch] = Field(default_factory=list)
     bundle_id: int | None = None
     content: str | None = None
+    footnotes: list[Footnote] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
@@ -338,9 +469,20 @@ class Chapter(BaseModel):
             content = data.get("content")
             if isinstance(content, dict):
                 attachments = data.get("attachments") or []
-                data = {**data, "content": _prosemirror_to_html(content, attachments)}
+                rendered, footnotes = _prosemirror_to_html(content, attachments)
             elif isinstance(content, str):
-                data = {**data, "content": _sanitize_content_html(content)}
+                rendered, footnotes = _sanitize_content_html(content)
+            else:
+                return data
+            # A Chapter being re-validated from its own dump (model_validate(model_dump()))
+            # already has its footnotes out of ``content`` — keep them rather than overwrite
+            # them with the now-empty re-extraction.
+            data = {
+                **data,
+                "content": rendered,
+                "footnotes": data.get("footnotes")
+                or [{"content": footnote} for footnote in footnotes],
+            }
         return data
 
 
