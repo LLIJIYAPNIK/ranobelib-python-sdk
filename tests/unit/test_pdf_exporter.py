@@ -192,3 +192,11 @@ async def test_pdf_exporter_calls_on_chapter_once_per_chapter(tmp_path: Path) ->
     )
 
     assert calls == 2
+
+
+def test_chapter_html_includes_footnotes() -> None:
+    chapter = _chapter(volume="1", number="1", name=None, content="<p>Story.</p><p>↑ Note.</p>")
+
+    result = _chapter_html(chapter, {})
+
+    assert "<p>Story.</p><hr /><p><strong>Notes</strong></p><p>Note.</p>" in result

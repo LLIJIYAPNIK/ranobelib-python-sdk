@@ -14,6 +14,8 @@
 
 ::: ranobelib.Chapter
 
+::: ranobelib.Footnote
+
 ::: ranobelib.Volume
 
 ::: ranobelib.ChapterBranch

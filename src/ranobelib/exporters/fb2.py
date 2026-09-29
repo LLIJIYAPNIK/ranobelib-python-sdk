@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from ranobelib.exporters import register
-from ranobelib.exporters._shared import chapter_heading
+from ranobelib.exporters._shared import chapter_body_html, chapter_heading
 from ranobelib.models import Chapter, Title
 
 FB2_NS = "http://www.gribuser.ru/xml/fictionbook/2.0"
@@ -133,7 +133,7 @@ def _build_body(chapters: list[Chapter], on_chapter: Callable[[], None] | None) 
         section = ET.SubElement(body, _tag("section"))
         section_title = ET.SubElement(section, _tag("title"))
         ET.SubElement(section_title, _tag("p")).text = chapter_heading(chapter)
-        for paragraph in html_to_fb2_paragraphs(chapter.content or ""):
+        for paragraph in html_to_fb2_paragraphs(chapter_body_html(chapter)):
             section.append(paragraph)
         if on_chapter is not None:
             on_chapter()

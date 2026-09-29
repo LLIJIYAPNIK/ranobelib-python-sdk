@@ -268,3 +268,196 @@ def test_chapter_content_prosemirror_no_attachments_key() -> None:
     chapter = Chapter.model_validate(raw)
 
     assert chapter.content == ""
+
+
+def _footnote_contents(chapter: Chapter) -> list[str]:
+    return [footnote.content for footnote in chapter.footnotes]
+
+
+def test_chapter_footnotes_default_to_empty() -> None:
+    assert Chapter.model_validate(BASE_CHAPTER).footnotes == []
+    assert Chapter.model_validate({**BASE_CHAPTER, "content": "<p>Text.</p>"}).footnotes == []
+
+
+def test_chapter_footnotes_string_paragraphs_moved_out_of_content() -> None:
+    # Shape observed in real HTML-string chapters (see docs/api-notes.md): one <p> per
+    # footnote, arrow + non-breaking space, after the chapter's last real paragraph.
+    raw = {
+        **BASE_CHAPTER,
+        "content": (
+            '<p data-paragraph-index="1">Story*.</p>'
+            '<p data-paragraph-index="2">↑ Бумажный веер.</p>'
+            '<p data-paragraph-index="3">↑ Second note.</p>'
+        ),
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>Story*.</p>"
+    assert _footnote_contents(chapter) == ["Бумажный веер.", "Second note."]
+
+
+def test_chapter_footnotes_string_ordered_list_items() -> None:
+    # The other real HTML-string shape: an <ol> of <li>, with the arrow as an entity.
+    raw = {
+        **BASE_CHAPTER,
+        "content": (
+            "<p>Story.</p>\r\n\r\n<ol>\r\n\t<li>&uarr;&nbsp;Первая.</li>\r\n"
+            "\t<li>&uarr;&nbsp;Вторая.</li>\r\n</ol>"
+        ),
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert "↑" not in (chapter.content or "")
+    assert "Первая" not in (chapter.content or "")
+    assert (chapter.content or "").startswith("<p>Story.</p>")
+    assert _footnote_contents(chapter) == ["Первая.", "Вторая."]
+
+
+def test_chapter_footnotes_string_keeps_sanitized_inline_markup() -> None:
+    raw = {
+        **BASE_CHAPTER,
+        "content": '<p><b>↑ Term</b> — <i class="x">meaning</i><script>bad()</script></p>',
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == ""
+    assert _footnote_contents(chapter) == ["<strong>Term</strong> — <em>meaning</em>"]
+
+
+def test_chapter_footnotes_string_arrow_not_at_start_is_regular_text() -> None:
+    raw = {**BASE_CHAPTER, "content": "<p>Prices went ↑ today.</p><li>Item ↑</li>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>Prices went ↑ today.</p>Item ↑"
+    assert chapter.footnotes == []
+
+
+def test_chapter_footnotes_string_empty_footnote_dropped() -> None:
+    raw = {**BASE_CHAPTER, "content": "<p>Text.</p><p>↑ </p>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>Text.</p>"
+    assert chapter.footnotes == []
+
+
+def test_chapter_footnotes_string_non_footnote_list_item_keeps_text() -> None:
+    raw = {**BASE_CHAPTER, "content": "<ul><li>One</li><li>Two</li></ul>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "OneTwo"
+
+
+def test_chapter_footnotes_string_paragraph_inside_list_item() -> None:
+    raw = {**BASE_CHAPTER, "content": "<ol><li><p>↑ Nested.</p></li></ol>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == ""
+    assert _footnote_contents(chapter) == ["Nested."]
+
+
+def test_chapter_content_string_implicitly_closes_unclosed_paragraphs() -> None:
+    raw = {**BASE_CHAPTER, "content": "<p>One<p>↑ Note<p>Two"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>One</p><p>Two</p>"
+    assert _footnote_contents(chapter) == ["Note"]
+
+
+def test_chapter_content_string_closes_blocks_left_open_inside_closed_one() -> None:
+    raw = {**BASE_CHAPTER, "content": "<li><p>Text</li><p>After</p>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>Text</p><p>After</p>"
+
+
+def test_chapter_content_string_drops_stray_block_end_tags() -> None:
+    raw = {**BASE_CHAPTER, "content": "</p>Text</li><p/>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "Text<p></p>"
+
+
+def _prosemirror_paragraph(*children: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "paragraph", "content": list(children)}
+
+
+def test_chapter_footnotes_prosemirror_paragraphs_moved_out_of_content() -> None:
+    raw = {
+        **BASE_CHAPTER,
+        "content": {
+            "type": "doc",
+            "content": [
+                _prosemirror_paragraph({"type": "text", "text": "Story."}),
+                _prosemirror_paragraph(
+                    {"type": "text", "text": "↑ "},
+                    {"type": "text", "text": "Term", "marks": [{"type": "bold"}]},
+                    {"type": "text", "text": " — meaning <x>"},
+                ),
+                _prosemirror_paragraph({"type": "text", "text": "↑"}),
+            ],
+        },
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>Story.</p>"
+    assert _footnote_contents(chapter) == ["<strong>Term</strong> — meaning &lt;x&gt;"]
+
+
+def test_chapter_footnotes_prosemirror_skips_non_text_nodes_before_arrow() -> None:
+    raw = {
+        **BASE_CHAPTER,
+        "content": {
+            "type": "doc",
+            "content": [
+                _prosemirror_paragraph(
+                    {"type": "hardBreak"},
+                    {"type": "text", "text": "  "},
+                    {"type": "text", "text": "↑ Note."},
+                ),
+                _prosemirror_paragraph({"type": "hardBreak"}),
+                _prosemirror_paragraph({"type": "text", "text": "Up ↑"}),
+            ],
+        },
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p><br /></p><p>Up ↑</p>"
+    assert _footnote_contents(chapter) == ["<br />  Note."]
+
+
+def test_chapter_footnotes_prosemirror_inside_unknown_block_node() -> None:
+    raw = {
+        **BASE_CHAPTER,
+        "content": {
+            "type": "doc",
+            "content": [
+                {
+                    "type": "blockquote",
+                    "content": [_prosemirror_paragraph({"type": "text", "text": "↑ Deep."})],
+                }
+            ],
+        },
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == ""
+    assert _footnote_contents(chapter) == ["Deep."]
+
+
+def test_chapter_footnotes_survive_dump_and_revalidate() -> None:
+    chapter = Chapter.model_validate({**BASE_CHAPTER, "content": "<p>Text.</p><p>↑ Note.</p>"})
+
+    assert Chapter.model_validate(chapter.model_dump()) == chapter

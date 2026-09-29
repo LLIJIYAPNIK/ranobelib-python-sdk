@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from ranobelib.exporters import register
-from ranobelib.exporters._shared import chapter_heading
+from ranobelib.exporters._shared import chapter_body_html, chapter_heading
 from ranobelib.models import Chapter, Title
 
 _BLOCK_TAGS = frozenset({"p", "div"})
@@ -91,7 +91,7 @@ class TxtExporter:
         """
         sections = [title.name]
         for chapter in chapters:
-            body = html_to_text(chapter.content or "")
+            body = html_to_text(chapter_body_html(chapter))
             sections.append(f"{chapter_heading(chapter)}\n\n{body}")
             if on_chapter is not None:
                 on_chapter()

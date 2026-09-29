@@ -205,3 +205,21 @@ async def test_epub_exporter_calls_on_chapter_once_per_chapter(tmp_path: Path) -
     )
 
     assert calls == 2
+
+
+async def test_epub_exporter_includes_footnotes_and_their_images(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"IMAGEBYTES")
+
+    content = '<p>Story.</p><p>↑ Note <img src="https://img.example/fn.jpg" /></p>'
+    chapters = [_chapter(volume="1", number="1", name=None, content=content)]
+    output_path = tmp_path / "out.epub"
+
+    await EpubExporter(transport=httpx.MockTransport(handler)).export(
+        _title(), chapters, output_path
+    )
+
+    chapter_xhtml = _read_zip_entry(output_path, "EPUB/chapter_1.xhtml").decode("utf-8")
+    assert "Notes" in chapter_xhtml
+    assert "Note" in chapter_xhtml
+    assert 'src="images/img0001.jpg"' in chapter_xhtml

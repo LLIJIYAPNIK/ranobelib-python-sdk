@@ -2,10 +2,10 @@
 
 The API exposes no content-length or image-size field anywhere (see docs/api-notes.md), so
 any size here is necessarily approximate for the image portion: chapter text is measured
-exactly (the UTF-8 byte length of ``Chapter.content``), but each embedded ``<img>`` is
-assumed to weigh ``average_image_size`` bytes rather than downloaded to measure precisely —
-doing that would cost the same network traffic this module exists to help avoid paying
-upfront. The result approximates the underlying content size, not a specific export
+exactly (the UTF-8 byte length of ``Chapter.content`` plus its footnotes), but each embedded
+``<img>`` is assumed to weigh ``average_image_size`` bytes rather than downloaded to measure
+precisely — doing that would cost the same network traffic this module exists to help avoid
+paying upfront. The result approximates the underlying content size, not a specific export
 format's file size (epub's zip compression, pdf's layout overhead, fb2's XML verbosity are
 not modeled) — enough to decide whether a title is worth downloading, not to predict an
 exported file's exact byte count.
@@ -40,8 +40,11 @@ def chapter_size(chapter: Chapter, *, average_image_size: int = DEFAULT_AVERAGE_
             f"Chapter {chapter.volume}/{chapter.number} has no content to size — "
             "fetch it first, e.g. via get_chapter()."
         )
-    text_bytes = len(chapter.content.encode("utf-8"))
-    image_count = len(extract_image_urls(chapter.content))
+    # Footnotes are split out of ``content`` (see ``Chapter.footnotes``) but are still part
+    # of what was downloaded — and of what every exporter writes out.
+    text = chapter.content + "".join(footnote.content for footnote in chapter.footnotes)
+    text_bytes = len(text.encode("utf-8"))
+    image_count = len(extract_image_urls(text))
     return text_bytes + image_count * average_image_size
 
 

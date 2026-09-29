@@ -163,6 +163,44 @@ text too); every attribute is dropped except `img`'s `src`, and only when it res
 render as raw HTML regardless of which format the API used for a given chapter — see
 `_sanitize_content_html`/`_ContentSanitizer` in `models.py`.
 
+### Translator footnotes (issue #58)
+
+**The API has no structured footnotes.** Checked both content formats: 313 cached chapter
+responses (308 of `6712--high-school-dxd-novel`, 5 of another title; 263 HTML-string, 50
+prosemirror) plus ~45 live chapters from 12 recently updated titles (all prosemirror). The
+prosemirror node types seen were only `doc`/`paragraph`/`text`/`hardBreak`/`heading`/`image`/
+`horizontalRule`, marks only `bold`/`italic` — no footnote node, mark or attribute. The
+HTML-string chapters carry no `<sup>`, `id`/`href` anchors or classes either. A footnote is
+just translator-typed text, in (at least) these shapes, all seen within the one DxD title:
+
+1. **`↑`-prefixed blocks** — `<p>↑&nbsp;text</p>` one per footnote, or an
+   `<ol><li>&uarr;&nbsp;text</li>…</ol>` list (older chapters). All 10 chapters of the
+   cached sample that contain a `↑` use it this way: 42 `↑` in total, every one at the start
+   of a block, none anywhere else in the text. In all 10 the footnotes are a contiguous run
+   at the very end of the chapter.
+2. **Numbered asterisks** — `word*1` in the text, a trailing `<p>1*text</p>` per note.
+3. **A "Заметки переводчика" heading paragraph** followed by `<p>[1] text</p>` items, with
+   `word [1]` in the text.
+
+**What the SDK detects: only shape 1.** A `p`/`li` (HTML-string) or `paragraph`
+(prosemirror) whose first non-blank text starts with `↑` is moved out of `Chapter.content`
+into `Chapter.footnotes` (`Footnote.content`: sanitized inline HTML, arrow and following
+whitespace stripped, no wrapping `<p>`). `↑` is distinctive enough to be unambiguous in the
+sample; shapes 2 and 3 aren't — `[1]`, `1*` and a "notes" heading are ordinary text too, and
+guessing wrong would silently delete story text from `content`. They stay in `content` as
+before; recognizing them is a possible future extension if it turns out to matter.
+
+**No marker/back-reference.** The issue's proposed `Footnote.marker` isn't there because the
+data has nothing to fill it with: in shape 1 the reference point in the text is a bare,
+unnumbered `*` after a word (count matches the footnote count in the chapters checked), but
+the same text also uses `*` for `***` scene breaks, `*action*` emphasis and censored digits
+(`32****8517`) — 416 paragraphs with a `*` right after a non-space character across the
+cached chapters, vs 42 footnotes. The order of `Chapter.footnotes` (source order) is the only link available.
+
+Exporters list a chapter's footnotes after its text under a "Notes" heading
+(`exporters/_shared.py`'s `chapter_body_html`), so moving them out of `content` doesn't drop
+them from exported files; `sizing.chapter_size()` counts them too.
+
 ### No bulk "volume content" endpoint
 
 Checked for a shortcut before implementing `get_volume()` (fetch a whole volume's chapters

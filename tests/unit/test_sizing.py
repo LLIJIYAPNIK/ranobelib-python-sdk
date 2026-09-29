@@ -76,3 +76,11 @@ def test_volume_size_raises_value_error_when_any_chapter_missing_content() -> No
 
     with pytest.raises(ValueError, match="no content to size"):
         volume_size(volume)
+
+
+def test_chapter_size_includes_footnotes_and_their_images() -> None:
+    chapter = _chapter('<p>a</p><p>↑ note <img src="https://ranobelib.me/a.jpg" /></p>')
+
+    footnote = chapter.footnotes[0].content
+    expected = len(b"<p>a</p>") + len(footnote.encode()) + DEFAULT_AVERAGE_IMAGE_SIZE
+    assert chapter_size(chapter) == expected

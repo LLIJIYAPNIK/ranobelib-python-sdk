@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from ranobelib.exporters import EXPORTERS, Exporter, register
+from ranobelib.exporters._shared import chapter_body_html
 from ranobelib.exporters.txt import TxtExporter, html_to_text
 from ranobelib.models import Chapter, Cover, Label, Title
 
@@ -147,3 +148,29 @@ async def test_txt_exporter_works_without_on_chapter(tmp_path: Path) -> None:
     result = await TxtExporter().export(title, chapters, tmp_path / "out.txt")
 
     assert result.exists()
+
+
+def test_chapter_body_html_is_content_when_no_footnotes() -> None:
+    chapter = _chapter(volume="1", number="1", name=None, content="<p>Text.</p>")
+
+    assert chapter_body_html(chapter) == "<p>Text.</p>"
+
+
+def test_chapter_body_html_appends_footnotes_after_content() -> None:
+    chapter = _chapter(
+        volume="1", number="1", name=None, content="<p>Text*.</p><p>↑ A <b>note</b>.</p>"
+    )
+
+    assert chapter_body_html(chapter) == (
+        "<p>Text*.</p><hr /><p><strong>Notes</strong></p><p>A <strong>note</strong>.</p>"
+    )
+
+
+async def test_txt_exporter_includes_footnotes(tmp_path: Path) -> None:
+    chapters = [_chapter(volume="1", number="1", name=None, content="<p>Story.</p><p>↑ Note.</p>")]
+    output_path = tmp_path / "out.txt"
+
+    await TxtExporter().export(_title(), chapters, output_path)
+
+    text = output_path.read_text(encoding="utf-8")
+    assert text.endswith("Story.\n\n---\n\nNotes\n\nNote.\n")
