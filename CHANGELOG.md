@@ -9,6 +9,17 @@ project follows [Semantic Versioning](https://semver.org/). Entries are generate
 `main` whenever a GitHub Release is published — don't hand-edit released sections, fix the
 underlying commit message/PR title instead and let the next release regenerate this file.
 
+## [0.10.0] - 2026-09-29
+
+### Added
+
+- Expose translator footnotes as Chapter.footnotes
+- Keep footnotes in exports and size estimates
+
+### Fixed
+
+- Keep paragraph boundaries of dropped block-level tags
+
 ## [0.9.0] - 2026-08-14
 
 ### Added
@@ -122,6 +133,7 @@ underlying commit message/PR title instead and let the next release regenerate t
 - Pin setup-uv to an existing tag
 - Make Exporter.export async
 
+[0.10.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.9.0..v0.10.0
 [0.9.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.8.0..v0.9.0
 [0.8.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.7.0..v0.8.0
 [0.7.0]: https://github.com/LLIJIYAPNIK/ranobelib-python-sdk/compare/v0.6.1..v0.7.0
