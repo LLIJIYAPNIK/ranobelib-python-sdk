@@ -181,3 +181,15 @@ async def test_fb2_exporter_calls_on_chapter_once_per_chapter(tmp_path: Path) ->
     await Fb2Exporter().export(title, chapters, tmp_path / "out.fb2", on_chapter=on_chapter)
 
     assert calls == 2
+
+
+async def test_fb2_exporter_includes_footnotes(tmp_path: Path) -> None:
+    chapters = [_chapter(volume="1", number="1", name=None, content="<p>Story.</p><p>↑ Note.</p>")]
+    output_path = tmp_path / "out.fb2"
+
+    await Fb2Exporter().export(_title(), chapters, output_path)
+
+    section = etree.parse(str(output_path)).getroot().find("fb:body/fb:section", namespaces=_NSMAP)
+    assert section is not None
+    texts = ["".join(p.itertext()).strip() for p in section.findall("fb:p", namespaces=_NSMAP)]
+    assert texts == ["Story.", "Notes", "Note."]

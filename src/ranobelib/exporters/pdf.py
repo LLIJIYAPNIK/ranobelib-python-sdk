@@ -20,7 +20,7 @@ from ranobelib.exporters._illustrations import (
     pick_cover_url,
     rewrite_image_srcs,
 )
-from ranobelib.exporters._shared import chapter_heading
+from ranobelib.exporters._shared import chapter_body_html, chapter_heading
 from ranobelib.models import Chapter, Title
 
 try:
@@ -63,7 +63,7 @@ def _title_page_html(title: Title, cover_data_uri: str | None) -> str:
 
 def _chapter_html(chapter: Chapter, url_to_data_uri: dict[str, str]) -> str:
     heading = html.escape(chapter_heading(chapter))
-    body = rewrite_image_srcs(chapter.content or "", url_to_data_uri)
+    body = rewrite_image_srcs(chapter_body_html(chapter), url_to_data_uri)
     return f'<section class="chapter"><h1>{heading}</h1>{body}</section>'
 
 
@@ -136,7 +136,7 @@ if weasyprint is not None:
                     dict.fromkeys(
                         url
                         for chapter in chapters
-                        for url in extract_image_urls(chapter.content or "")
+                        for url in extract_image_urls(chapter_body_html(chapter))
                     )
                 )
                 images = await download_images(client, image_urls)

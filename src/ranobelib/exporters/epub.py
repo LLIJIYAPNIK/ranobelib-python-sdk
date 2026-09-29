@@ -19,7 +19,7 @@ from ranobelib.exporters._illustrations import (
     pick_cover_url,
     rewrite_image_srcs,
 )
-from ranobelib.exporters._shared import chapter_heading
+from ranobelib.exporters._shared import chapter_body_html, chapter_heading
 from ranobelib.models import Chapter, Title
 
 
@@ -83,7 +83,9 @@ class EpubExporter:
 
             image_urls = list(
                 dict.fromkeys(
-                    url for chapter in chapters for url in extract_image_urls(chapter.content or "")
+                    url
+                    for chapter in chapters
+                    for url in extract_image_urls(chapter_body_html(chapter))
                 )
             )
             images = await download_images(client, image_urls)
@@ -106,7 +108,7 @@ class EpubExporter:
         toc: list[object] = []
         for index, chapter in enumerate(chapters, start=1):
             heading = chapter_heading(chapter)
-            body = rewrite_image_srcs(chapter.content or "", url_to_local)
+            body = rewrite_image_srcs(chapter_body_html(chapter), url_to_local)
             doc = epub.EpubHtml(
                 uid=f"chapter_{index}",
                 file_name=f"chapter_{index}.xhtml",
