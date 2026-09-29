@@ -143,18 +143,68 @@ _DROPPED_CONTENT_TEXT_TAGS = frozenset({"script", "style"})
 _SAFE_IMG_SCHEMES = frozenset({"http", "https"})
 
 
-_FOOTNOTE_BLOCK_TAGS = frozenset({"p", "li"})
+_DROPPED_BLOCK_TAGS = frozenset(
+    {
+        "address",
+        "article",
+        "aside",
+        "blockquote",
+        "caption",
+        "center",
+        "dd",
+        "details",
+        "div",
+        "dl",
+        "dt",
+        "fieldset",
+        "figcaption",
+        "figure",
+        "footer",
+        "form",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "header",
+        "hgroup",
+        "li",
+        "main",
+        "nav",
+        "ol",
+        "pre",
+        "section",
+        "summary",
+        "table",
+        "tbody",
+        "td",
+        "tfoot",
+        "th",
+        "thead",
+        "tr",
+        "ul",
+    }
+)
+_BLOCK_TAGS = _DROPPED_BLOCK_TAGS | {"p"}
 
 
 class _Block:
-    """A ``p``/``li`` still being parsed — buffered, since whether it's a footnote (see
-    ``Chapter.footnotes``) is only known once its first non-blank text arrives."""
+    """A ``p`` or dropped block-level tag still being parsed.
+
+    ``run`` is the inline content collected since the block opened or since its last child
+    block — for a ``p`` that's its whole content; for a dropped block it's flushed into its
+    own ``<p>`` in ``segments`` whenever a child block (or ``hr``) starts, and when the block
+    closes. Each such paragraph is checked for a footnote on its own, so buffering is needed:
+    whether it is one is only known once its first non-blank text arrives.
+    """
 
     def __init__(self, tag: str) -> None:
         self.tag = tag
-        self.parts: list[str] = []
+        self.segments: list[str] = []
+        self.run: list[str] = []
+        self.arrow_index: int | None = None
         self.seen_text = False
-        self.is_footnote = False
 
 
 class _ContentSanitizer(HTMLParser):
@@ -173,10 +223,15 @@ class _ContentSanitizer(HTMLParser):
     kept as escaped text — anywhere else, a dropped tag's text content is kept (e.g. a
     stripped ``<a href="...">text</a>`` still leaves ``text`` behind).
 
-    A ``p`` or ``li`` whose first non-blank text starts with ``_FOOTNOTE_ARROW`` is a
-    translator footnote: it's collected into ``footnotes`` (sanitized inner HTML, arrow
-    stripped) instead of the output. ``li`` is otherwise still dropped like any other tag
-    outside the vocabulary (its text kept) — footnotes are the one case it's recognized for.
+    A dropped *block-level* tag (``li``, ``div``, ``h3``, ...) keeps the paragraph boundary
+    it gave its text: its inline content is wrapped in ``<p>`` rather than inlined into the
+    parent, one ``<p>`` per run of inline content between nested blocks, so the output stays
+    a flat sequence of paragraphs whatever the nesting was. Opening a block inside an open
+    ``p`` closes that ``p`` first, as HTML itself does (a ``p`` can't contain blocks).
+
+    A paragraph — an explicit ``p`` or one made from a dropped block's text — whose first
+    non-blank text starts with ``_FOOTNOTE_ARROW`` is a translator footnote: it's collected
+    into ``footnotes`` (sanitized inner HTML, arrow stripped) instead of the output.
     """
 
     def __init__(self) -> None:
@@ -187,37 +242,65 @@ class _ContentSanitizer(HTMLParser):
         self.footnotes: list[str] = []
 
     def _out(self) -> list[str]:
-        return self._blocks[-1].parts if self._blocks else self._output
+        return self._blocks[-1].run if self._blocks else self._output
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in _FOOTNOTE_BLOCK_TAGS:
+        if tag in _BLOCK_TAGS:
             self._open_block(tag)
         else:
             self._emit(tag, attrs)
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in _FOOTNOTE_BLOCK_TAGS:
+        if tag in _BLOCK_TAGS:
             self._open_block(tag)
             self._close_block()
         else:
             self._emit(tag, attrs)
 
     def _open_block(self, tag: str) -> None:
-        # Same implicit close HTML itself does: a new <p> ends an open <p>, <li> an open <li>.
-        if self._blocks and self._blocks[-1].tag == tag:
+        # Same implicit closes HTML itself does: any block ends an open <p>, and a new <li>
+        # ends an open <li>.
+        if self._blocks and (self._blocks[-1].tag == "p" or self._blocks[-1].tag == tag == "li"):
             self._close_block()
         self._blocks.append(_Block(tag))
 
     def _close_block(self) -> None:
         block = self._blocks.pop()
-        inner = "".join(block.parts)
-        if block.is_footnote:
-            if inner.strip():
-                self.footnotes.append(inner.strip())
-        elif block.tag == "p":
-            self._out().append(f"<p>{inner}</p>")
+        if block.tag == "p":
+            paragraph = self._take_paragraph(block, keep_empty=True)
         else:
-            self._out().append(inner)
+            self._flush_run(block)
+            paragraph = "".join(block.segments)
+        if paragraph:
+            self._append_block_html(paragraph)
+
+    def _take_paragraph(self, block: _Block, *, keep_empty: bool) -> str:
+        """Turn ``block.run`` into a ``<p>`` (or a footnote, returning ``""``) and reset it."""
+        run, arrow_index = block.run, block.arrow_index
+        block.run, block.arrow_index, block.seen_text = [], None, False
+        if arrow_index is not None:
+            run[arrow_index] = run[arrow_index].lstrip()[len(_FOOTNOTE_ARROW) :].lstrip()
+            inner = "".join(run).strip()
+            if inner:
+                self.footnotes.append(inner)
+            return ""
+        inner = "".join(run)
+        if keep_empty:
+            return f"<p>{inner}</p>"
+        return f"<p>{inner.strip()}</p>" if inner.strip() else ""
+
+    def _flush_run(self, block: _Block) -> None:
+        paragraph = self._take_paragraph(block, keep_empty=False)
+        if paragraph:
+            block.segments.append(paragraph)
+
+    def _append_block_html(self, block_html: str) -> None:
+        if not self._blocks:
+            self._output.append(block_html)
+            return
+        parent = self._blocks[-1]
+        self._flush_run(parent)
+        parent.segments.append(block_html)
 
     def _emit(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         resolved = _CONTENT_TAG_ALIASES.get(tag, tag)
@@ -230,13 +313,17 @@ class _ContentSanitizer(HTMLParser):
             if src and urlsplit(src).scheme in _SAFE_IMG_SCHEMES:
                 self._out().append(f'<img loading="lazy" src="{html.escape(src, quote=True)}" />')
             return
+        if resolved == "hr" and self._blocks and self._blocks[-1].tag != "p":
+            # Between a dropped block's paragraphs, not inside one.
+            self._append_block_html("<hr />")
+            return
         if resolved in _VOID_CONTENT_TAGS:
             self._out().append(f"<{resolved} />")
         else:
             self._out().append(f"<{resolved}>")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in _FOOTNOTE_BLOCK_TAGS:
+        if tag in _BLOCK_TAGS:
             # Close up to the matching open block; a stray end tag with none open is dropped.
             if any(block.tag == tag for block in self._blocks):
                 while self._blocks[-1].tag != tag:
@@ -254,14 +341,11 @@ class _ContentSanitizer(HTMLParser):
     def handle_data(self, data: str) -> None:
         if self._skip_text_depth > 0:
             return
-        if self._blocks and not self._blocks[-1].seen_text:
+        if self._blocks and not self._blocks[-1].seen_text and data.strip():
             block = self._blocks[-1]
-            stripped = data.lstrip()
-            if stripped:
-                block.seen_text = True
-                if stripped.startswith(_FOOTNOTE_ARROW):
-                    block.is_footnote = True
-                    data = stripped[len(_FOOTNOTE_ARROW) :].lstrip()
+            block.seen_text = True
+            if data.lstrip().startswith(_FOOTNOTE_ARROW):
+                block.arrow_index = len(block.run)
         self._out().append(html.escape(data))
 
     def get_html(self) -> str:

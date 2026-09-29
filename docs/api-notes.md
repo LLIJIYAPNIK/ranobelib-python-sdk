@@ -159,7 +159,26 @@ carry tags/attributes outside it (`data-paragraph-index`, `b`/`i` instead of `st
 worse, see the tag survey above). `b`/`i` are folded into `strong`/`em`; every other
 unrecognized tag is dropped (its text kept, except inside `script`/`style`, which drop their
 text too); every attribute is dropped except `img`'s `src`, and only when it resolves to an
-`http(s)` URL. So exporters only ever handle one shape *and* `Chapter.content` is safe to
+`http(s)` URL.
+
+**Dropped block-level tags keep their paragraph boundary (issue #59).** Dropping a tag but
+keeping its text is fine for inline wrappers (`a`, `span`), but for a block wrapper it used
+to remove the only boundary its text had: the text landed as bare text outside any `<p>`,
+running into its neighbors. Block tags observed in the cached HTML-string chapters of
+`6712--high-school-dxd-novel` (263 chapters): `h3` (13 section headings, e.g.
+`<h3>Император</h3>`, in 5 chapters) and `ol`/`li` (footnote lists, 5 chapters) — no `div`,
+`blockquote`, tables or other lists. The sanitizer handles the standard HTML block tags
+anyway (`li`, `div`, `h1`–`h6`, `blockquote`, `section`, table cells, ... — see
+`_DROPPED_BLOCK_TAGS`), since it exists to cope with markup it can't predict: a dropped
+block's inline content is wrapped in `<p>`, one `<p>` per run of inline content between
+nested blocks (`<div>a<p>b</p>c</div>` → `<p>a</p><p>b</p><p>c</p>`), whitespace-only runs
+(the `\r\n\t` between `<li>`s) are dropped, and opening any block inside an open `<p>` closes
+that `<p>` first, as HTML does. So `Chapter.content` is a flat sequence of `<p>`/`<hr />`/
+`<img>` for block-structured input, same as the prosemirror path produces. A heading comes
+out as a plain `<p>` (no heading tag in the vocabulary — adding one would be a separate
+change to every exporter). Re-checked on the same 263 chapters: 10 change (exactly the
+`h3`/`ol` ones), their visible text and footnotes are identical before/after, and none has
+text left outside a `<p>`. So exporters only ever handle one shape *and* `Chapter.content` is safe to
 render as raw HTML regardless of which format the API used for a given chapter — see
 `_sanitize_content_html`/`_ContentSanitizer` in `models.py`.
 
@@ -182,8 +201,9 @@ just translator-typed text, in (at least) these shapes, all seen within the one 
 3. **A "Заметки переводчика" heading paragraph** followed by `<p>[1] text</p>` items, with
    `word [1]` in the text.
 
-**What the SDK detects: only shape 1.** A `p`/`li` (HTML-string) or `paragraph`
-(prosemirror) whose first non-blank text starts with `↑` is moved out of `Chapter.content`
+**What the SDK detects: only shape 1.** A paragraph — `p`, or one made from a dropped
+block's text such as `li` (HTML-string, see above), or `paragraph` (prosemirror) — whose
+first non-blank text starts with `↑` is moved out of `Chapter.content`
 into `Chapter.footnotes` (`Footnote.content`: sanitized inline HTML, arrow and following
 whitespace stripped, no wrapping `<p>`). `↑` is distinctive enough to be unambiguous in the
 sample; shapes 2 and 3 aren't — `[1]`, `1*` and a "notes" heading are ordinary text too, and

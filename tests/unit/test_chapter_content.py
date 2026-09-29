@@ -332,7 +332,7 @@ def test_chapter_footnotes_string_arrow_not_at_start_is_regular_text() -> None:
 
     chapter = Chapter.model_validate(raw)
 
-    assert chapter.content == "<p>Prices went ↑ today.</p>Item ↑"
+    assert chapter.content == "<p>Prices went ↑ today.</p><p>Item ↑</p>"
     assert chapter.footnotes == []
 
 
@@ -345,12 +345,14 @@ def test_chapter_footnotes_string_empty_footnote_dropped() -> None:
     assert chapter.footnotes == []
 
 
-def test_chapter_footnotes_string_non_footnote_list_item_keeps_text() -> None:
-    raw = {**BASE_CHAPTER, "content": "<ul><li>One</li><li>Two</li></ul>"}
+def test_chapter_content_string_list_items_become_paragraphs() -> None:
+    # Issue #59: a dropped block tag used to leave its text inline, running adjacent
+    # blocks together into one unparagraphed line.
+    raw = {**BASE_CHAPTER, "content": "<ul>\r\n\t<li>One</li>\r\n\t<li>Two</li>\r\n</ul>"}
 
     chapter = Chapter.model_validate(raw)
 
-    assert chapter.content == "OneTwo"
+    assert chapter.content == "<p>One</p><p>Two</p>"
 
 
 def test_chapter_footnotes_string_paragraph_inside_list_item() -> None:
@@ -461,3 +463,81 @@ def test_chapter_footnotes_survive_dump_and_revalidate() -> None:
     chapter = Chapter.model_validate({**BASE_CHAPTER, "content": "<p>Text.</p><p>↑ Note.</p>"})
 
     assert Chapter.model_validate(chapter.model_dump()) == chapter
+
+
+def test_chapter_content_string_heading_becomes_paragraph() -> None:
+    # Real shape (see docs/api-notes.md): <h3> section headings between paragraphs.
+    raw = {
+        **BASE_CHAPTER,
+        "content": "<p>Before.</p>\r\n\r\n<h3>Император</h3>\r\n\r\n<p>After.</p>",
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>Before.</p>\r\n\r\n<p>Император</p>\r\n\r\n<p>After.</p>"
+
+
+def test_chapter_content_string_dropped_block_keeps_inline_markup() -> None:
+    raw = {**BASE_CHAPTER, "content": '<div class="x"> <b>Bold</b> and <a href="#">link</a> </div>'}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p><strong>Bold</strong> and link</p>"
+
+
+def test_chapter_content_string_dropped_block_splits_text_around_nested_blocks() -> None:
+    raw = {
+        **BASE_CHAPTER,
+        "content": "<div>Intro<p>Inner</p>Middle<blockquote>Quote</blockquote>Outro</div>",
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>Intro</p><p>Inner</p><p>Middle</p><p>Quote</p><p>Outro</p>"
+
+
+def test_chapter_content_string_block_inside_paragraph_closes_it() -> None:
+    raw = {**BASE_CHAPTER, "content": "<p>Text<div>Block</div>tail</p>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>Text</p><p>Block</p>tail"
+
+
+def test_chapter_content_string_table_cells_become_paragraphs() -> None:
+    raw = {
+        **BASE_CHAPTER,
+        "content": "<table><tr><td>A</td><td>B</td></tr><tr><td></td></tr></table>",
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>A</p><p>B</p>"
+
+
+def test_chapter_content_string_hr_inside_dropped_block_separates_paragraphs() -> None:
+    raw = {**BASE_CHAPTER, "content": "<div>One<hr>Two</div><p>a<hr/>b</p>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>One</p><hr /><p>Two</p><p>a<hr />b</p>"
+
+
+def test_chapter_content_string_unclosed_list_items_close_each_other() -> None:
+    raw = {**BASE_CHAPTER, "content": "<ol><li>One<li>Two</ol>"}
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>One</p><p>Two</p>"
+
+
+def test_chapter_footnotes_string_detected_per_paragraph_in_dropped_block() -> None:
+    raw = {
+        **BASE_CHAPTER,
+        "content": ("<div>Story.<p>More.</p>↑ Note.</div><div><span>↑</span> Other.</div>"),
+    }
+
+    chapter = Chapter.model_validate(raw)
+
+    assert chapter.content == "<p>Story.</p><p>More.</p>"
+    assert _footnote_contents(chapter) == ["Note.", "Other."]
