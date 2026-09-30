@@ -128,11 +128,12 @@ async with Catalog() as catalog:
 
 Базовый URL: `https://api.cdnlibs.org/api`. Запросы идут без авторизации, 200 OK, но
 перед API (и перед `cover.cdnlibs.org`) стоит DDoS-Guard: с 2026-09-30 он отвечает
-HTML-403 (не JSON-403 самого API) на любой запрос без `Referer: https://ranobelib.me/`.
-Проверено, что достаточно одного `Referer` (`User-Agent` сам по себе ни на что не влияет);
-SDK шлёт `Origin`/`Referer`/`User-Agent` браузера (`ranobelib/_http.py`'s `BROWSER_HEADERS`)
-и в `ApiClient`, и в image-клиентах epub/pdf, `ApiClient(headers=...)` позволяет их
-перекрыть. Подробности и таблица проверенных комбинаций — в `docs/api-notes.md`, раздел
+HTML-403 (не JSON-403 самого API) на любой запрос без непустого `Referer` — значение не
+проверяется (проходит даже `Referer: x`), `Origin`/`User-Agent` сами по себе ни на что не
+влияют. SDK шлёт `Origin`/`Referer`/`User-Agent` браузера (`ranobelib/_http.py`'s
+`BROWSER_HEADERS`) и в `ApiClient`, и в image-клиентах epub/pdf, `ApiClient(headers=...)`
+позволяет их перекрыть. Такой HTML-403 SDK отличает от JSON-403 API по `Content-Type` и кидает
+`AccessBlockedError`, а не `AuthRequiredError`. Подробности и таблица проверенных комбинаций — в `docs/api-notes.md`, раздел
 "WAF 403".
 
 `api.cdnlibs.org` общий для всей сети lib.social (mangalib, ranobelib, hentailib, ...).
@@ -299,7 +300,10 @@ ranobelib-python-sdk/
   — на усмотрение реализующего PR, задокументировать выбор).
 - Кастомные исключения в `exceptions.py`: `RanobeLibError` (база), `TitleNotFoundError`,
   `ChapterNotFoundError`, `VolumeNotFoundError`, `MultipleTranslationsError`,
-  `AuthRequiredError` (для 403/платного контента — понятная ошибка вместо падения), `RateLimitError`.
+  `AuthRequiredError` (для 403/платного контента — понятная ошибка вместо падения), `RateLimitError`,
+  `AccessBlockedError` (HTML-403 от DDoS-Guard перед API — не авторизация; отличается от
+  JSON-403 API по `Content-Type` ответа, не по тексту заглушки, и не ретраится — см.
+  `docs/api-notes.md`, раздел "WAF 403").
 
 Реализовано (`client.py`): выбрана ручная реализация, не `tenacity` — вся логика (семафор +
 пейсинг + backoff) укладывается в ~20 строк, `tenacity` добавил бы зависимость ради обёртки,

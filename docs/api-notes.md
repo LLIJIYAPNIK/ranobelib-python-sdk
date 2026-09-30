@@ -8,7 +8,7 @@ list of open questions.
 ## Confirmed
 
 - Base URL: `https://api.cdnlibs.org/api`, no authorization required for public content —
-  but a ranobelib.me `Referer` is (see "WAF 403" below).
+  but a non-empty `Referer` is (see "WAF 403" below).
 - `GET /api/manga/{slug}/chapters` returns the full chapter list (including fractional
   chapters) in a single response, keyed under `"data"`. No pagination observed so far on a
   308-chapter title.
@@ -42,7 +42,7 @@ the JSON error body shown above instead. Successful (2xx) responses are JSON eit
 SDK client sends `Accept: application/json` on every request to avoid parsing HTML by
 accident.
 
-### WAF 403: a ranobelib.me `Referer` is required (checked 2026-09-30)
+### WAF 403: a non-empty `Referer` is required (checked 2026-09-30)
 
 `api.cdnlibs.org` and `cover.cdnlibs.org` sit behind DDoS-Guard (`Server: ddos-guard` on
 every response). By 2026-09-30 its edge started rejecting the SDK's requests — which until
@@ -73,27 +73,64 @@ Checked against the live API on 2026-09-30, same IP, on `GET /api/manga/{slug}` 
 | `Referer: https://ranobelib.me` (no trailing `/`) only | 200 JSON |
 | `Origin: https://example.com` only | 403 HTML |
 
-So the filter keys on `Referer` — `User-Agent` alone neither causes nor fixes the block (no
-TLS/HTTP2 fingerprinting needed, at least as of this date). With all three headers,
+Follow-up the same day (while reproducing `AccessBlockedError` for
+`examples/11_error_handling.py`), `GET /api/manga/{slug}` only:
+
+| Headers on top of `Site-Id` + `Accept` | Result |
+|---|---|
+| `Referer: https://example.com/` only | 200 JSON |
+| `Referer: https://mangalib.me/` only | 200 JSON |
+| `Referer: x` only | 200 JSON |
+| `Origin: https://ranobelib.me` + `Referer: https://example.com/` + UA | 200 JSON |
+| `Referer:` (empty value) only | 403 HTML |
+
+So the filter only checks that a **non-empty `Referer` is present** — its value isn't
+checked against ranobelib.me, or even for being a URL (the first round of checks above only
+ever tried ranobelib.me values, so it wrongly read as "a ranobelib.me `Referer`";
+corrected by the follow-up). `Origin` doesn't count, and `User-Agent` alone neither causes
+nor fixes the block (no TLS/HTTP2 fingerprinting needed, at least as of this date). With all three headers,
 `/chapters` and `/chapter` also return 200, and a missing chapter still returns the API's own
 JSON 404, so error mapping is unaffected.
 
 Images: a title cover on `cover.cdnlibs.org` returned the same 403 without headers and 200
-with them — which silently dropped covers from epub/pdf exports, since illustration
+with them (same rule: `Referer: x` and `Referer: https://example.com/` got 200 too) — which silently dropped covers from epub/pdf exports, since illustration
 downloads are best-effort. An in-chapter image on `ranobelib.me/uploads/...` returned 200
 either way (also behind `ddos-guard`, just not filtered by `Referer` at the time).
 
 What the SDK sends as a result (`ranobelib/_http.py`'s `BROWSER_HEADERS`): `Origin`,
 `Referer` (`https://ranobelib.me/`, trailing slash, as the browser sends it) and an iPhone
-Safari `User-Agent`, taken from a real browser session on the site. Only `Referer` was
-needed, but all three are sent so the request as a whole matches the site's own traffic
-rather than half-imitating it — a real browser never sends a site `Referer` with a
-`python-httpx` UA. They go on every `ApiClient` request and on the epub/pdf exporters'
+Safari `User-Agent`, taken from a real browser session on the site. Only *some* `Referer`
+is needed today, but the site's own value is sent, alongside the other two, so the request
+as a whole matches the site's own traffic rather than half-imitating it — a real browser
+never sends a site `Referer` with a `python-httpx` UA, and a stricter future rule is likelier
+to check for ranobelib.me than to reject it. They go on every `ApiClient` request and on the epub/pdf exporters'
 image clients (the latter without `Site-Id`/`Accept`, which are API-specific).
 `ApiClient(headers=...)` merges extra headers over these (a given key replaces the default,
 case-insensitively), so a caller can swap the `User-Agent` if the edge's rules change again
 without waiting for an SDK release. Not forwarded through `RanobeLib`/`Catalog`, same as
 `ApiClient`'s other settings (see "Rate limiting и retry").
+
+#### `AccessBlockedError` vs `AuthRequiredError`
+
+`ApiClient` used to turn *any* 403 into `AuthRequiredError` ("Authorization required") — a
+misleading hint when it's the edge, not the API, refusing the request. The two are now told
+apart by the response's `Content-Type`: `application/json` (the API's own 403, e.g. `{"message":
+"User is not logged in."}`) → `AuthRequiredError` as before; anything else, including a
+missing `Content-Type` (the edge's HTML page) → `AccessBlockedError`. `Content-Type` rather
+than the page's text ("That's an error."), since the wording of an edge's error page is the
+likeliest thing about it to change, while "the API answers in JSON" is the API's contract
+(see "`Accept: application/json` is required for JSON error bodies" above: with that header
+sent, even the API's own error pages are JSON).
+
+`AccessBlockedError` isn't retried (403 isn't in `ApiClient`'s retryable statuses, and
+`download_title()`'s extra retry layer only rides out `RateLimitError`) — resending the same
+request with the same headers gets the same answer. Inside `download_title()` it's still a
+`RanobeLibError`, so it's wrapped in `DownloadTitleInterruptedError` with the chapters
+already fetched, like any other mid-download failure.
+
+Reproducible on demand — unlike `AuthRequiredError`, which needs a paywalled title — by
+sending an empty `Referer`: `ApiClient(headers={"Referer": ""})` (that's what
+`examples/11_error_handling.py` does, against the live API).
 
 ### `get_info()` — verified `fields[]` list
 
