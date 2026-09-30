@@ -1,6 +1,7 @@
 """Unit tests for ranobelib.exceptions."""
 
 from ranobelib.exceptions import (
+    AccessBlockedError,
     AmbiguousChapter,
     AuthRequiredError,
     ChapterNotFoundError,
@@ -52,6 +53,20 @@ def test_auth_required_error_carries_url() -> None:
     assert isinstance(error, RanobeLibError)
     assert error.url == url
     assert url in str(error)
+
+
+def test_access_blocked_error_carries_url_and_hints() -> None:
+    url = "https://api.cdnlibs.org/api/manga/6712--example"
+    error = AccessBlockedError(url)
+
+    assert isinstance(error, RanobeLibError)
+    assert not isinstance(error, AuthRequiredError)
+    assert error.url == url
+    message = str(error)
+    assert url in message
+    assert "not an authorization issue" in message
+    assert "ApiClient(headers=...)" in message
+    assert "IP" in message
 
 
 def test_rate_limit_error_without_retry_after() -> None:

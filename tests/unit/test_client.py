@@ -9,6 +9,7 @@ import pytest
 
 from ranobelib.client import ApiClient
 from ranobelib.exceptions import (
+    AccessBlockedError,
     AuthRequiredError,
     ChapterNotFoundError,
     RanobeLibError,
@@ -95,6 +96,93 @@ async def test_get_title_raises_auth_required_on_403() -> None:
     async with _client(handler) as client:
         with pytest.raises(AuthRequiredError):
             await client.get_title("1--paywalled")
+
+
+_EDGE_403_PAGE = (
+    "<!DOCTYPE html><html lang=en><title>403 - Forbidden</title>"
+    "<p>403 - Forbidden . That's an error.</p></html>"
+)
+
+_CATALOG_CALL_KWARGS: dict[str, Any] = {
+    "page": 1,
+    "per_page": 30,
+    "query": None,
+    "genres": None,
+    "tags": None,
+    "status": None,
+    "countries": None,
+    "sort": "last_chapter_at",
+}
+
+
+def _edge_403(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(
+        403, headers={"Content-Type": "text/html; charset=utf-8"}, text=_EDGE_403_PAGE
+    )
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        pytest.param(lambda client: client.get_title("1--example"), id="title"),
+        pytest.param(lambda client: client.get_chapters("1--example"), id="chapters"),
+        pytest.param(
+            lambda client: client.get_chapter("1--example", volume="1", number="1"),
+            id="chapter",
+        ),
+        pytest.param(lambda client: client.list_titles(**_CATALOG_CALL_KWARGS), id="catalog"),
+        pytest.param(lambda client: client.list_genres(), id="genres"),
+        pytest.param(lambda client: client.list_countries(), id="countries"),
+    ],
+)
+async def test_html_403_raises_access_blocked_not_auth_required(
+    call: Callable[[ApiClient], Any],
+) -> None:
+    async with _client(_edge_403) as client:
+        with pytest.raises(AccessBlockedError) as exc_info:
+            await call(client)
+
+    assert not isinstance(exc_info.value, AuthRequiredError)
+    assert exc_info.value.url.startswith("https://api.cdnlibs.org/api/")
+
+
+@pytest.mark.parametrize(
+    ("content_type", "expected"),
+    [
+        ("application/json", AuthRequiredError),
+        ("Application/JSON; charset=utf-8", AuthRequiredError),
+        ("text/html; charset=utf-8", AccessBlockedError),
+        ("text/plain", AccessBlockedError),
+        (None, AccessBlockedError),
+    ],
+)
+async def test_403_is_classified_by_content_type(
+    content_type: str | None, expected: type[Exception]
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        response = httpx.Response(403, content=b'{"message": "User is not logged in."}')
+        if content_type is not None:
+            response.headers["Content-Type"] = content_type
+        return response
+
+    async with _client(handler) as client:
+        with pytest.raises(expected):
+            await client.get_title("1--example")
+
+
+async def test_html_403_is_not_retried() -> None:
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return _edge_403(request)
+
+    async with _client(handler) as client:
+        with pytest.raises(AccessBlockedError):
+            await client.get_title("1--example")
+
+    assert calls == 1
 
 
 async def test_get_title_raises_rate_limit_error_on_429_with_retry_after() -> None:

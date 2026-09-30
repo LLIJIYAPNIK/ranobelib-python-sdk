@@ -8,7 +8,11 @@ import pytest
 from rich.console import Console
 
 from ranobelib.console import Reporter
-from ranobelib.exceptions import DownloadTitleInterruptedError, RateLimitError
+from ranobelib.exceptions import (
+    AccessBlockedError,
+    DownloadTitleInterruptedError,
+    RateLimitError,
+)
 from ranobelib.exporters import EXPORTERS
 from ranobelib.models import Chapter, Title
 from ranobelib.sdk import RanobeLib, _group_into_volumes, _resolve_bulk_branch_id
@@ -428,6 +432,47 @@ async def test_download_title_raises_interrupted_error_with_partial_progress(
     assert error.total == 3
     assert [chapter.number for chapter in error.volumes[0].chapters] == ["0"]
     assert isinstance(error.__cause__, RateLimitError)
+
+
+async def test_download_title_wraps_access_blocked_without_retrying(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    raw_chapters = [_raw_toc_chapter("1", str(index)) for index in range(3)]
+    fetched: list[str] = []
+    sleeps: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    async def fake_get_chapters(*, refresh: bool = False) -> list[dict[str, Any]]:
+        return raw_chapters
+
+    async def fake_fetch_chapter(
+        volume_str: str, number: str, branch_id: int | None, *, refresh: bool = False
+    ) -> Chapter:
+        fetched.append(number)
+        if number == "1":
+            raise AccessBlockedError("https://api.cdnlibs.org/api/manga/1--slug/chapter")
+        return _fake_content_chapter(volume_str, number, branch_id)
+
+    monkeypatch.setattr("ranobelib.sdk.asyncio.sleep", fake_sleep)
+
+    async with RanobeLib("1--slug") as lib:
+        monkeypatch.setattr(lib, "_get_chapters", fake_get_chapters)
+        monkeypatch.setattr(lib, "_fetch_chapter", fake_fetch_chapter)
+
+        with pytest.raises(DownloadTitleInterruptedError) as exc_info:
+            await lib.download_title()
+
+    error = exc_info.value
+    assert error.completed == 1
+    assert error.total == 3
+    assert [chapter.number for chapter in error.volumes[0].chapters] == ["0"]
+    assert isinstance(error.__cause__, AccessBlockedError)
+    # The bulk rate-limit retry layer only rides out RateLimitError: a blocked request is
+    # given up on immediately, not waited on and resent.
+    assert fetched == ["0", "1"]
+    assert sleeps == []
 
 
 async def test_download_title_max_rate_limit_retries_zero_disables_extra_retrying(
