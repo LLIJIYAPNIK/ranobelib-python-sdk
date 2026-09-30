@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import html
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import ClassVar
 
 import httpx
 from ebooklib import epub
 
-from ranobelib._http import BROWSER_HEADERS
+from ranobelib._http import browser_headers
 from ranobelib.exporters import register
 from ranobelib.exporters._illustrations import (
     download_images,
@@ -48,6 +48,7 @@ class EpubExporter:
         output_path: Path,
         *,
         on_chapter: Callable[[], None] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Path:
         """Write ``chapters`` to ``output_path`` as an EPUB file.
 
@@ -61,6 +62,8 @@ class EpubExporter:
             output_path: Where to write the ``.epub`` file.
             on_chapter: Called once per chapter embedded, if given — after illustrations
                 have already been downloaded, see the ``Exporter`` protocol's docstring.
+            headers: Extra HTTP headers for illustration downloads, merged over the
+                SDK's browser-like defaults (a given key replaces the default one).
 
         Returns:
             ``output_path``.
@@ -78,7 +81,7 @@ class EpubExporter:
             timeout=15.0,
             follow_redirects=True,
             transport=self._transport,
-            headers=BROWSER_HEADERS,
+            headers=browser_headers(headers),
         ) as client:
             cover_url = pick_cover_url(title.cover)
             if cover_url is not None:

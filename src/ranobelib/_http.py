@@ -8,6 +8,10 @@ exporters from depending on ``ApiClient``'s module just for a constant.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
+import httpx
+
 SITE_ORIGIN = "https://ranobelib.me"
 """Origin of the ranobelib.me website, as its own pages send it."""
 
@@ -27,3 +31,15 @@ without a non-empty ``Referer`` with an HTML 403 page (see docs/api-notes.md, se
 together with ``Origin`` and a real browser ``User-Agent``, so the request as a whole matches
 what the site itself sends rather than advertising ``python-httpx``.
 """
+
+
+def browser_headers(overrides: Mapping[str, str] | None = None) -> httpx.Headers:
+    """``BROWSER_HEADERS`` with ``overrides`` merged over them.
+
+    A key in ``overrides`` replaces the default one, matched case-insensitively (``httpx``
+    headers semantics) — the same merge ``ApiClient(headers=...)`` does for API requests.
+    """
+    headers = httpx.Headers(BROWSER_HEADERS)
+    if overrides:
+        headers.update(overrides)
+    return headers

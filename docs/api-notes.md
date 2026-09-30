@@ -103,12 +103,20 @@ Safari `User-Agent`, taken from a real browser session on the site. Only *some* 
 is needed today, but the site's own value is sent, alongside the other two, so the request
 as a whole matches the site's own traffic rather than half-imitating it — a real browser
 never sends a site `Referer` with a `python-httpx` UA, and a stricter future rule is likelier
-to check for ranobelib.me than to reject it. They go on every `ApiClient` request and on the epub/pdf exporters'
-image clients (the latter without `Site-Id`/`Accept`, which are API-specific).
-`ApiClient(headers=...)` merges extra headers over these (a given key replaces the default,
-case-insensitively), so a caller can swap the `User-Agent` if the edge's rules change again
-without waiting for an SDK release. Not forwarded through `RanobeLib`/`Catalog`, same as
-`ApiClient`'s other settings (see "Rate limiting и retry").
+to check for ranobelib.me than to reject it. They go on every `ApiClient` request and on
+the epub/pdf exporters' image clients (the latter without `Site-Id`/`Accept`, which are
+API-specific).
+
+`headers=` on `RanobeLib`, `Catalog` (and the underlying `ApiClient`) merges extra headers
+over these (a given key replaces the default, case-insensitively), so a caller can send what
+the edge expects if its rules change again, without waiting for an SDK release.
+`RanobeLib.export()` passes the same `headers` on to the exporter
+(`Exporter.export(..., headers=...)`), so epub/pdf illustration downloads — cover.cdnlibs.org
+sits behind the same edge — use them too. This is the one `ApiClient` setting the facades
+forward: the others (`timeout`, `base_url`, retry/pacing, see "Rate limiting и retry") tune
+*how* the SDK talks to the API and have working defaults, while headers decide *whether*
+the edge lets the SDK talk to it at all — without a way to change them from the facades,
+a rule change on the site's side would leave every SDK user stuck until the next release.
 
 #### `AccessBlockedError` vs `AuthRequiredError`
 
@@ -129,7 +137,7 @@ request with the same headers gets the same answer. Inside `download_title()` it
 already fetched, like any other mid-download failure.
 
 Reproducible on demand — unlike `AuthRequiredError`, which needs a paywalled title — by
-sending an empty `Referer`: `ApiClient(headers={"Referer": ""})` (that's what
+sending an empty `Referer`: `RanobeLib(..., headers={"Referer": ""})` (that's what
 `examples/11_error_handling.py` does, against the live API).
 
 ### `get_info()` — verified `fields[]` list
@@ -418,7 +426,8 @@ PR, с требованием задокументировать решение 
   тестам retry не нужен — юнит-тесты полностью покрывают эту логику через `httpx.MockTransport`.
 
 **Реализация** (`ApiClient`, все параметры — только на уровне клиента, не пробрасываются
-через `RanobeLib`, аналогично `timeout`/`base_url`):
+через `RanobeLib`, аналогично `timeout`/`base_url`; единственное исключение среди настроек
+`ApiClient` — `headers`, см. раздел "WAF 403" выше):
 
 - `max_concurrency=5` — `asyncio.Semaphore`, оборачивает сам HTTP-запрос (не время
   ожидания backoff между попытками — семафор освобождается на время сна между ретраями,

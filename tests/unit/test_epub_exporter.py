@@ -212,6 +212,24 @@ async def test_epub_exporter_downloads_images_with_browser_headers(tmp_path: Pat
         assert "Site-Id" not in request.headers
 
 
+async def test_epub_exporter_headers_override_browser_defaults(tmp_path: Path) -> None:
+    requested: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request)
+        return httpx.Response(200, content=b"IMAGEBYTES")
+
+    title = _title(cover=Cover(default="https://cover.example/cover.jpg"))
+
+    await EpubExporter(transport=httpx.MockTransport(handler)).export(
+        title, [], tmp_path / "out.epub", headers={"user-agent": "CustomAgent/1.0"}
+    )
+
+    [request] = requested
+    assert request.headers.get_list("User-Agent") == ["CustomAgent/1.0"]
+    assert request.headers["Referer"] == BROWSER_HEADERS["Referer"]
+
+
 async def test_epub_exporter_calls_on_chapter_once_per_chapter(tmp_path: Path) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=b"IMAGEBYTES")

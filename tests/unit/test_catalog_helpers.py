@@ -1,6 +1,6 @@
-"""Unit tests for ranobelib.catalog helpers (no network)."""
+"""Unit tests for ranobelib.catalog: helpers, plus Catalog construction (no network)."""
 
-from ranobelib.catalog import _build_countries, _build_genres, _build_page, _cache_key
+from ranobelib.catalog import Catalog, _build_countries, _build_genres, _build_page, _cache_key
 from ranobelib.models import CatalogPage, Country, Genre, Title
 
 _TITLE_ITEM = {
@@ -205,3 +205,19 @@ def test_build_countries_drops_countries_not_tagged_for_ranobelib() -> None:
 
 def test_build_countries_handles_empty_results() -> None:
     assert _build_countries([]) == []
+
+
+async def test_catalog_headers_are_merged_into_the_api_client() -> None:
+    async with Catalog(headers={"user-agent": "CustomAgent/1.0"}) as catalog:
+        sent = catalog._client._http.headers
+
+    assert sent.get_list("User-Agent") == ["CustomAgent/1.0"]
+    assert sent["Referer"] == "https://ranobelib.me/"
+    assert sent["Site-Id"] == "3"
+
+
+async def test_catalog_headers_default_to_browser_like_ones() -> None:
+    async with Catalog() as catalog:
+        sent = catalog._client._http.headers
+
+    assert sent["User-Agent"].startswith("Mozilla/5.0 (iPhone;")

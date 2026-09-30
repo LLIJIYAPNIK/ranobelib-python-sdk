@@ -46,6 +46,7 @@ from ranobelib import RanobeLib
 async with RanobeLib(
     "https://ranobelib.me/ru/book/6712--high-school-dxd-novel",
     verbosity="progress_only",       # False (default) / "progress_only" / "full"
+    headers=None,                    # доп. HTTP-заголовки поверх браузерных дефолтов (шаг 32)
 ) as lib:
     info = await lib.get_info()                       # метаданные тайтла
     toc = await lib.get_table_of_contents()            # тома/главы/названия, без контента
@@ -131,10 +132,11 @@ async with Catalog() as catalog:
 HTML-403 (не JSON-403 самого API) на любой запрос без непустого `Referer` — значение не
 проверяется (проходит даже `Referer: x`), `Origin`/`User-Agent` сами по себе ни на что не
 влияют. SDK шлёт `Origin`/`Referer`/`User-Agent` браузера (`ranobelib/_http.py`'s
-`BROWSER_HEADERS`) и в `ApiClient`, и в image-клиентах epub/pdf, `ApiClient(headers=...)`
-позволяет их перекрыть. Такой HTML-403 SDK отличает от JSON-403 API по `Content-Type` и кидает
-`AccessBlockedError`, а не `AuthRequiredError`. Подробности и таблица проверенных комбинаций — в `docs/api-notes.md`, раздел
-"WAF 403".
+`BROWSER_HEADERS`) и в `ApiClient`, и в image-клиентах epub/pdf; `headers=` на
+`RanobeLib`/`Catalog`/`ApiClient` позволяет их перекрыть (шаг 32). Такой HTML-403 SDK
+отличает от JSON-403 API по `Content-Type` и кидает `AccessBlockedError`, а не
+`AuthRequiredError`. Подробности и таблица проверенных комбинаций — в `docs/api-notes.md`,
+раздел "WAF 403".
 
 `api.cdnlibs.org` общий для всей сети lib.social (mangalib, ranobelib, hentailib, ...).
 Эндпоинты тайтла и списка глав (`/api/manga/{slug_url}`, `/api/manga/{slug_url}/chapters`)
@@ -313,7 +315,9 @@ ranobelib-python-sdk/
 этими настройками (`max_concurrency=5`, `request_delay=0.2s`, `max_retries=3`,
 `retry_base_delay=1.0s`, экспоненциально ×2 за попытку, `Retry-After` уважается при 429);
 `RanobeLib` их не пробрасывает — та же логика, что уже принята для `timeout`/`base_url`
-(`ApiClient`-only, не публичный контракт SDK).
+(`ApiClient`-only, не публичный контракт SDK). Единственное исключение — `headers` (см.
+roadmap-шаг 32): пробрасывается через `RanobeLib`/`Catalog`, т.к. решает не "как" SDK
+общается с API, а "пустит ли" DDoS-Guard его вообще.
 
 ## Экспорт
 
@@ -323,7 +327,15 @@ ranobelib-python-sdk/
 class Exporter(Protocol):
     format: ClassVar[str]
 
-    async def export(self, title: Title, chapters: list[Chapter], output_path: Path) -> Path: ...
+    async def export(
+        self,
+        title: Title,
+        chapters: list[Chapter],
+        output_path: Path,
+        *,
+        on_chapter: Callable[[], None] | None = None,   # шаг 23
+        headers: Mapping[str, str] | None = None,       # шаг 32
+    ) -> Path: ...
 
 EXPORTERS: dict[str, type[Exporter]] = {}
 
@@ -1126,5 +1138,26 @@ owner/repo/workflow-file/environment) — это может сделать то�
       абзац (явный `p` или собранный из текста выброшенного блока), начинающийся с `↑`.
     - Проверено на 263 реальных HTML-главах: меняются ровно 10 (с `h3`/`ol`), видимый текст
       и сноски до/после совпадают, голого текста вне `<p>` не осталось ни в одной.
+
+32. **Проброс `headers=` через `RanobeLib`/`Catalog`** (после блока DDoS-Guard 2026-09-30 —
+    см. "Что уже известно про API" выше и `docs/api-notes.md`, раздел "WAF 403").
+    - До этого шага `headers=` был только у `ApiClient` (как и остальные его настройки, см.
+      "Rate limiting и ошибки"), а фасады создавали `ApiClient()` без аргументов — пользователь
+      SDK не мог сам подстроиться под смену правил DDoS-Guard, и подсказка
+      `AccessBlockedError` отсылала к внутреннему классу. Теперь `RanobeLib(..., headers=...)`
+      и `Catalog(headers=...)` передают их в `ApiClient`; семантика та же — мерж поверх
+      `BROWSER_HEADERS` + `Site-Id`/`Accept`, ключ перекрывает дефолт без учёта регистра.
+    - **Осознанное исключение из правила "настройки `ApiClient` не пробрасываются"**, только
+      для `headers`: `timeout`/`base_url`/ретраи настраивают, *как* SDK общается с API, и у
+      них рабочие дефолты; заголовки решают, *пустит ли* edge вообще — без проброса смена
+      правил на стороне сайта ломает всех пользователей до следующего релиза. Остальные
+      настройки `ApiClient` по-прежнему не пробрасываются.
+    - Обложки качаются с `cover.cdnlibs.org` за тем же edge'ем, поэтому `RanobeLib.export()`
+      передаёт те же `headers` экспортёру: протокол `Exporter.export()` получил необязательный
+      `headers: Mapping[str, str] | None = None` (тем же способом, что `on_chapter` в шаге 23);
+      epub/pdf мержат его поверх `BROWSER_HEADERS` (`_http.browser_headers()`), txt/fb2
+      принимают и игнорируют. Сторонний экспортёр, написанный под старую сигнатуру, нужно
+      дополнить этим параметром — `RanobeLib.export()` передаёт его всегда (как и
+      `on_chapter`), без проверки сигнатуры экспортёра через `inspect`.
 
 Каждый пункт — отдельная ветка/PR по правилам из раздела Git workflow.

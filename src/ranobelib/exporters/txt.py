@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import ClassVar
@@ -77,6 +77,7 @@ class TxtExporter:
         output_path: Path,
         *,
         on_chapter: Callable[[], None] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Path:
         """Write ``chapters`` to ``output_path`` as plain text.
 
@@ -85,6 +86,8 @@ class TxtExporter:
             chapters: The chapters to include, in the order they should appear.
             output_path: Where to write the ``.txt`` file.
             on_chapter: Called once per chapter written, if given.
+            headers: Accepted for the ``Exporter`` protocol and ignored — this format
+                downloads nothing (no illustrations in txt, see CLAUDE.md).
 
         Returns:
             ``output_path``.
