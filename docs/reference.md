@@ -38,6 +38,8 @@
 
 ::: ranobelib.AuthRequiredError
 
+::: ranobelib.AccessBlockedError
+
 ::: ranobelib.RateLimitError
 
 ::: ranobelib.DownloadTitleInterruptedError

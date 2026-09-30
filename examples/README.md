@@ -23,7 +23,7 @@ mini-tutorial for the feature it demonstrates, not just copy-pasted.
 | [`08_download_title.py`](08_download_title.py) | `download_title()` — whole-title bulk download |
 | [`09_disk_caching.py`](09_disk_caching.py) | disk cache + `refresh=True` |
 | [`10_export_formats.py`](10_export_formats.py) | `export()` to txt/fb2/epub/pdf |
-| [`11_error_handling.py`](11_error_handling.py) | `TitleNotFoundError` / `ChapterNotFoundError` |
+| [`11_error_handling.py`](11_error_handling.py) | `TitleNotFoundError` / `ChapterNotFoundError` / `AccessBlockedError` |
 | [`12_catalog_listing.py`](12_catalog_listing.py) | `Catalog.list_titles()` — browsing/searching the catalog |
 | [`13_chapter_footnotes.py`](13_chapter_footnotes.py) | `Chapter.footnotes` — translator footnotes, separate from the text |
 
