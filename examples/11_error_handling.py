@@ -27,7 +27,6 @@ from ranobelib import (
     RanobeLib,
     TitleNotFoundError,
 )
-from ranobelib.client import ApiClient
 
 
 async def main() -> None:
@@ -45,18 +44,22 @@ async def main() -> None:
         except ChapterNotFoundError as exc:
             print(exc)
 
-    # AccessBlockedError, reproduced on purpose. RanobeLib always sends the right headers, so
-    # this drops down to the low-level ApiClient (not re-exported from `ranobelib` — it's the
-    # layer under RanobeLib/Catalog) and blanks out its Referer: the edge filter rejects
-    # requests without a non-empty Referer (see docs/api-notes.md, section "WAF 403"). The
-    # same `headers=` override is also the escape hatch in the other direction — sending
-    # *newer* headers if the site's rules change before an SDK release catches up.
-    async with ApiClient(headers={"Referer": ""}) as client:
+    # AccessBlockedError, reproduced on purpose. By default the SDK sends browser-like headers
+    # the edge accepts; `headers=` merges overrides over them, and here it blanks out the
+    # Referer — the edge filter rejects requests without a non-empty one (see
+    # docs/api-notes.md, section "WAF 403"). The same `headers=` (on RanobeLib and Catalog
+    # alike) is the escape hatch in the other direction too: sending what the edge expects
+    # if the site's rules change before an SDK release catches up, e.g.
+    # `headers={"User-Agent": "..."}`.
+    async with RanobeLib(
+        "https://ranobelib.me/ru/book/91443--new-hero-in-dxd", headers={"Referer": ""}
+    ) as lib:
         try:
-            await client.get_title("91443--new-hero-in-dxd")
+            # refresh=True skips the disk cache, so the request really goes out: a title
+            # cached by an earlier run would otherwise be returned without touching the API.
+            await lib.get_info(refresh=True)
         except AccessBlockedError as exc:
-            # exc.url is the blocked request; the message spells out what to try next.
-            print(exc.url)
+            # The message names the blocked request (also on exc.url) and what to try next.
             print(exc)
 
 
@@ -66,11 +69,12 @@ asyncio.run(main())
 #
 # Title not found: '1--this-title-does-not-exist-zzz'
 # Chapter not found: '91443--new-hero-in-dxd' volume='999' number='9999'
-# https://api.cdnlibs.org/api/manga/91443--new-hero-in-dxd
 # Request blocked by the site's protection (not an authorization issue):
-# https://api.cdnlibs.org/api/manga/91443--new-hero-in-dxd. The site may have changed which
-# requests it accepts: check for an SDK update, or send different headers via
-# ranobelib.client.ApiClient(headers=...). If the same URL doesn't open in a browser on this
-# network either, the IP itself is blocked and no header change will help.
+# https://api.cdnlibs.org/api/manga/91443--new-hero-in-dxd?fields%5B%5D=background&...
+# The site may have changed which requests it accepts: check for an SDK update, or send
+# different headers via RanobeLib(..., headers=...) / Catalog(headers=...). If the same URL
+# doesn't open in a browser on this network either, the IP itself is blocked and no header
+# change will help.
 #
-# (The last message is printed as a single line; wrapped here to fit the line length.)
+# (The last message is printed as a single line, with the full fields[] query string in the
+# URL; wrapped and shortened here to fit the line length.)
