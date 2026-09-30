@@ -193,3 +193,11 @@ async def test_fb2_exporter_includes_footnotes(tmp_path: Path) -> None:
     assert section is not None
     texts = ["".join(p.itertext()).strip() for p in section.findall("fb:p", namespaces=_NSMAP)]
     assert texts == ["Story.", "Notes", "Note."]
+
+
+async def test_fb2_exporter_accepts_and_ignores_headers(tmp_path: Path) -> None:
+    output_path = tmp_path / "out.fb2"
+
+    await Fb2Exporter().export(_title(), [], output_path, headers={"User-Agent": "X"})
+
+    assert output_path.exists()

@@ -150,6 +150,14 @@ async def test_txt_exporter_works_without_on_chapter(tmp_path: Path) -> None:
     assert result.exists()
 
 
+async def test_txt_exporter_accepts_and_ignores_headers(tmp_path: Path) -> None:
+    output_path = tmp_path / "out.txt"
+
+    await TxtExporter().export(_title(), [], output_path, headers={"User-Agent": "X"})
+
+    assert output_path.exists()
+
+
 def test_chapter_body_html_is_content_when_no_footnotes() -> None:
     chapter = _chapter(volume="1", number="1", name=None, content="<p>Text.</p>")
 

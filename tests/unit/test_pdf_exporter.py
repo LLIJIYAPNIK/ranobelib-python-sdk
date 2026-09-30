@@ -184,6 +184,27 @@ async def test_pdf_exporter_downloads_images_with_browser_headers(tmp_path: Path
 
 
 @needs_weasyprint
+async def test_pdf_exporter_headers_override_browser_defaults(tmp_path: Path) -> None:
+    from ranobelib.exporters.pdf import PdfExporter
+
+    requested: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request)
+        return httpx.Response(404)
+
+    title = _title(cover=Cover(default="https://cover.example/cover.jpg"))
+
+    await PdfExporter(transport=httpx.MockTransport(handler)).export(
+        title, [], tmp_path / "out.pdf", headers={"user-agent": "CustomAgent/1.0"}
+    )
+
+    [request] = requested
+    assert request.headers.get_list("User-Agent") == ["CustomAgent/1.0"]
+    assert request.headers["Referer"] == BROWSER_HEADERS["Referer"]
+
+
+@needs_weasyprint
 async def test_pdf_exporter_handles_no_cover_and_no_chapters(tmp_path: Path) -> None:
     from ranobelib.exporters.pdf import PdfExporter
 

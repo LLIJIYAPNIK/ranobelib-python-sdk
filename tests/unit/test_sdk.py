@@ -518,6 +518,7 @@ async def test_export_wires_on_chapter_to_progress_bar(
             output_path: Path,
             *,
             on_chapter: Any = None,
+            headers: Any = None,
         ) -> Path:
             for _ in chapters:
                 if on_chapter is not None:
@@ -553,3 +554,63 @@ async def test_export_wires_on_chapter_to_progress_bar(
         del EXPORTERS["recording-test-format"]
 
     assert "Exporting to recording-test-format" in buffer.getvalue()
+
+
+@pytest.mark.parametrize("headers", [None, {"User-Agent": "CustomAgent/1.0"}])
+async def test_export_forwards_headers_to_exporter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, headers: dict[str, str] | None
+) -> None:
+    received: list[Any] = []
+
+    class _HeadersExporter:
+        format = "headers-test-format"
+
+        async def export(
+            self,
+            title: Title,
+            chapters: list[Chapter],
+            output_path: Path,
+            *,
+            on_chapter: Any = None,
+            headers: Any = None,
+        ) -> Path:
+            received.append(headers)
+            return output_path
+
+    async def fake_get_title(*, refresh: bool = False) -> dict[str, Any]:
+        return {
+            "id": 1,
+            "name": "Title",
+            "slug": "1--slug",
+            "slug_url": "1--slug",
+            "cover": {},
+            "age_restriction": {"id": 0, "label": "16+"},
+            "status": {"id": 1, "label": "Ongoing"},
+        }
+
+    EXPORTERS["headers-test-format"] = _HeadersExporter
+    try:
+        async with RanobeLib("1--slug", headers=headers) as lib:
+            monkeypatch.setattr(lib, "_get_title", fake_get_title)
+            await lib.export([], fmt="headers-test-format", path=tmp_path / "out")
+    finally:
+        del EXPORTERS["headers-test-format"]
+
+    assert received == [headers]
+
+
+async def test_headers_are_merged_into_the_api_client() -> None:
+    async with RanobeLib("1--slug", headers={"user-agent": "CustomAgent/1.0"}) as lib:
+        sent = lib._client._http.headers
+
+    assert sent.get_list("User-Agent") == ["CustomAgent/1.0"]
+    assert sent["Referer"] == "https://ranobelib.me/"
+    assert sent["Site-Id"] == "3"
+
+
+async def test_headers_default_to_browser_like_ones() -> None:
+    async with RanobeLib("1--slug") as lib:
+        sent = lib._client._http.headers
+
+    assert sent["User-Agent"].startswith("Mozilla/5.0 (iPhone;")
+    assert sent["Referer"] == "https://ranobelib.me/"

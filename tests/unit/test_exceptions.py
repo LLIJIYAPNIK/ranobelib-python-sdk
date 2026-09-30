@@ -65,7 +65,8 @@ def test_access_blocked_error_carries_url_and_hints() -> None:
     message = str(error)
     assert url in message
     assert "not an authorization issue" in message
-    assert "ApiClient(headers=...)" in message
+    assert "RanobeLib(..., headers=...)" in message
+    assert "Catalog(headers=...)" in message
     assert "IP" in message
 
 
