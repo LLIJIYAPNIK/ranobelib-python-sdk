@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from types import TracebackType
 from typing import Any, Self
 
 import httpx
 
+from ranobelib._http import BROWSER_HEADERS
 from ranobelib.exceptions import (
     AuthRequiredError,
     ChapterNotFoundError,
@@ -36,6 +37,11 @@ class ApiClient:
     Bounds concurrency with a semaphore, paces request starts with a small fixed delay, and
     retries 429/5xx responses with exponential backoff — see docs/api-notes.md for why a
     manual implementation was chosen over a dependency like ``tenacity`` for this.
+
+    Every request carries browser-like ``Origin``/``Referer``/``User-Agent`` headers on top
+    of the API-specific ``Site-Id``/``Accept``: without a ranobelib.me ``Referer``, the
+    DDoS-Guard edge in front of the API answers every request with an HTML 403 page (see
+    docs/api-notes.md, section "WAF 403").
     """
 
     def __init__(
@@ -44,6 +50,7 @@ class ApiClient:
         base_url: str = API_BASE_URL,
         timeout: float = 15.0,
         transport: httpx.AsyncBaseTransport | None = None,
+        headers: Mapping[str, str] | None = None,
         max_concurrency: int = 5,
         request_delay: float | None = None,
         max_retries: int = 3,
@@ -57,6 +64,13 @@ class ApiClient:
             base_url: API base URL.
             timeout: Per-request timeout, in seconds.
             transport: Custom ``httpx`` transport, e.g. a mock transport for tests.
+            headers: Extra headers merged over the defaults (browser-like ``Origin``/
+                ``Referer``/``User-Agent`` plus the API's ``Site-Id``/``Accept``); a key
+                given here replaces the default one, matched case-insensitively. Meant for
+                swapping in a different ``User-Agent`` if the site's edge protection changes
+                its rules, without waiting for an SDK release. Overriding ``Site-Id`` or
+                ``Accept`` is possible but breaks the API's contract (see
+                docs/api-notes.md) — only do it knowingly.
             max_concurrency: Maximum number of requests in flight at once.
             request_delay: Minimum time, in seconds, between the start of one request and
                 the next, even under ``max_concurrency``. ``None`` (the default) uses
@@ -74,10 +88,13 @@ class ApiClient:
             timeout=timeout,
             transport=transport,
             headers={
+                **BROWSER_HEADERS,
                 "Site-Id": RANOBELIB_SITE_ID,
                 "Accept": "application/json",
             },
         )
+        if headers is not None:
+            self._http.headers.update(headers)
         self._semaphore = asyncio.Semaphore(max_concurrency)
         self._request_delay = DEFAULT_REQUEST_DELAY if request_delay is None else request_delay
         self._max_retries = max_retries

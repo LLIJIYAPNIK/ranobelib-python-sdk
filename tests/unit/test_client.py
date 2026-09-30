@@ -39,6 +39,35 @@ async def test_get_title_returns_data_payload() -> None:
     assert data == {"id": 1, "name": "Example"}
 
 
+async def test_requests_carry_browser_like_headers() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["Origin"] == "https://ranobelib.me"
+        assert request.headers["Referer"] == "https://ranobelib.me/"
+        assert request.headers["User-Agent"].startswith("Mozilla/5.0 (iPhone;")
+        assert "python-httpx" not in request.headers["User-Agent"]
+        assert request.headers["Site-Id"] == "3"
+        assert request.headers["Accept"] == "application/json"
+        return httpx.Response(200, json={"data": {}})
+
+    async with _client(handler) as client:
+        await client.get_title("1--example")
+
+
+async def test_headers_override_defaults_and_keep_the_rest() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers["User-Agent"] == "CustomAgent/1.0"
+        assert request.headers.get_list("User-Agent") == ["CustomAgent/1.0"]
+        assert request.headers["X-Extra"] == "yes"
+        assert request.headers["Referer"] == "https://ranobelib.me/"
+        assert request.headers["Site-Id"] == "3"
+        assert request.headers["Accept"] == "application/json"
+        return httpx.Response(200, json={"data": {}})
+
+    headers = {"user-agent": "CustomAgent/1.0", "X-Extra": "yes"}
+    async with _client(handler, headers=headers) as client:
+        await client.get_title("1--example")
+
+
 async def test_get_title_sends_requested_fields_as_query_params() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.params.get_list("fields[]") == ["summary", "genres"]

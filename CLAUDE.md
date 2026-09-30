@@ -126,8 +126,14 @@ async with Catalog() as catalog:
 
 ## Что уже известно про API (проверено вручную)
 
-Базовый URL: `https://api.cdnlibs.org/api`. Запросы идут без авторизации, 200 OK,
-CAPTCHA/Cloudflare не мешает базовым GET-запросам к `/api/manga/...`.
+Базовый URL: `https://api.cdnlibs.org/api`. Запросы идут без авторизации, 200 OK, но
+перед API (и перед `cover.cdnlibs.org`) стоит DDoS-Guard: с 2026-09-30 он отвечает
+HTML-403 (не JSON-403 самого API) на любой запрос без `Referer: https://ranobelib.me/`.
+Проверено, что достаточно одного `Referer` (`User-Agent` сам по себе ни на что не влияет);
+SDK шлёт `Origin`/`Referer`/`User-Agent` браузера (`ranobelib/_http.py`'s `BROWSER_HEADERS`)
+и в `ApiClient`, и в image-клиентах epub/pdf, `ApiClient(headers=...)` позволяет их
+перекрыть. Подробности и таблица проверенных комбинаций — в `docs/api-notes.md`, раздел
+"WAF 403".
 
 `api.cdnlibs.org` общий для всей сети lib.social (mangalib, ranobelib, hentailib, ...).
 Эндпоинты тайтла и списка глав (`/api/manga/{slug_url}`, `/api/manga/{slug_url}/chapters`)
@@ -216,6 +222,7 @@ ranobelib-python-sdk/
 ├── src/
 │   └── ranobelib/
 │       ├── __init__.py          # публичный экспорт (RanobeLib, модели, исключения)
+│       ├── _http.py             # общие для всех HTTP-клиентов браузерные заголовки
 │       ├── client.py            # низкоуровневый HTTP-клиент к api.cdnlibs.org
 │       ├── sdk.py                # класс RanobeLib — публичный фасад
 │       ├── models.py             # pydantic-модели (Title, Chapter, Volume, Team, Branch, ...)
