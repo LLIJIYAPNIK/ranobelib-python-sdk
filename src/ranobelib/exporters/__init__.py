@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import ClassVar, Protocol, TypeVar, runtime_checkable
 
@@ -30,6 +30,7 @@ class Exporter(Protocol):
         output_path: Path,
         *,
         on_chapter: Callable[[], None] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Path:
         """Write ``chapters`` (in the given order) to ``output_path``.
 
@@ -45,6 +46,10 @@ class Exporter(Protocol):
                 ``RanobeLib.export()``'s progress bar (see CLAUDE.md's roadmap step 23).
                 For epub/pdf this covers the per-chapter embedding step, not the earlier
                 illustration-download step, which isn't itself progress-reported.
+            headers: Extra HTTP headers for any downloads the exporter makes (epub/pdf
+                illustrations), merged over the SDK's browser-like defaults —
+                ``RanobeLib.export()`` passes its own ``headers=`` through here. Exporters
+                that make no requests (txt, fb2) accept and ignore it.
 
         Returns:
             ``output_path``, once the file has been written.

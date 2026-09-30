@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import xml.etree.ElementTree as ET
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import ClassVar
@@ -153,6 +153,7 @@ class Fb2Exporter:
         output_path: Path,
         *,
         on_chapter: Callable[[], None] | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> Path:
         """Write ``chapters`` to ``output_path`` as FB2 XML.
 
@@ -161,6 +162,8 @@ class Fb2Exporter:
             chapters: The chapters to include, in the order they should appear.
             output_path: Where to write the ``.fb2`` file.
             on_chapter: Called once per chapter written, if given.
+            headers: Accepted for the ``Exporter`` protocol and ignored — this format
+                downloads nothing (no illustrations in fb2, see CLAUDE.md).
 
         Returns:
             ``output_path``.

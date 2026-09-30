@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
@@ -68,6 +68,7 @@ class RanobeLib:
         cache_dir: str | Path | None = None,
         cache_ttl: float | None = None,
         verbosity: Verbosity = False,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         """Initialize the SDK for a title.
 
@@ -85,9 +86,18 @@ class RanobeLib:
                 ``"full"``: the same progress bars, plus a line logged for every title/
                 chapter-list/chapter-content fetch, noting whether it was served from the
                 disk cache or the API.
+            headers: Extra HTTP headers merged over the SDK's defaults (browser-like
+                ``Origin``/``Referer``/``User-Agent``, see docs/api-notes.md, section "WAF
+                403") — a key given here replaces the default one, matched
+                case-insensitively. Applied to every API request and, through ``export()``,
+                to epub/pdf illustration downloads. Meant for when the site's edge protection
+                changes which requests it lets through (``AccessBlockedError``): send what it
+                now expects without waiting for an SDK release. ``None`` (the default) sends
+                the defaults as-is.
         """
         self._slug_url = parse_slug_url(url)
-        self._client = ApiClient()
+        self._headers = dict(headers) if headers is not None else None
+        self._client = ApiClient(headers=self._headers)
         self._cache = DiskCache(
             cache_dir if cache_dir is not None else DEFAULT_CACHE_DIR, ttl=cache_ttl
         )
@@ -457,7 +467,8 @@ class RanobeLib:
             chapters: The chapters to include, in the order they should appear.
             path: Where to write the exported file.
             fmt: Export format — a key of ``ranobelib.exporters.EXPORTERS``
-                (currently: ``"txt"``, ``"fb2"``, ``"epub"``).
+                (currently: ``"txt"``, ``"fb2"``, ``"epub"``, and ``"pdf"`` where
+                WeasyPrint's native libraries are available).
 
         Raises:
             ValueError: If ``fmt`` isn't a registered export format.
@@ -468,7 +479,9 @@ class RanobeLib:
             raise ValueError(f"Unknown export format {fmt!r}. Available: {available}")
         title = await self.get_info()
         with self._reporter.progress(f"Exporting to {fmt}", len(chapters)) as advance:
-            return await exporter_cls().export(title, chapters, Path(path), on_chapter=advance)
+            return await exporter_cls().export(
+                title, chapters, Path(path), on_chapter=advance, headers=self._headers
+            )
 
     async def _build_volume(self, volume: int, raw_chapters: list[dict[str, Any]]) -> Volume:
         volume_str = str(volume)

@@ -160,10 +160,10 @@ class AccessBlockedError(RanobeLibError):
     of api.cdnlibs.org answers with an HTML 403 page (the API's own 403 is JSON) when it
     doesn't like the request — so far, a missing or empty ``Referer`` (see
     docs/api-notes.md, section "WAF 403"). The SDK already sends browser-like headers, so
-    seeing this means either the edge changed its rules — check for an SDK update, or, when
-    using ``ranobelib.client.ApiClient`` directly, pass different headers via its
-    ``headers=`` (``RanobeLib``/``Catalog`` don't forward it) — or the edge is blocking the
-    network/IP itself, which no header fixes. Not retried: resending the same request gets
+    seeing this means either the edge changed its rules — check for an SDK update, or send
+    what it now expects via ``headers=`` on ``RanobeLib``/``Catalog`` (or ``ApiClient``, if
+    using it directly) — or the edge is blocking the network/IP itself, which no header
+    fixes. Not retried: resending the same request gets
     the same answer.
 
     Attributes:
@@ -175,9 +175,9 @@ class AccessBlockedError(RanobeLibError):
         super().__init__(
             f"Request blocked by the site's protection (not an authorization issue): {url}. "
             "The site may have changed which requests it accepts: check for an SDK update, "
-            "or send different headers via ranobelib.client.ApiClient(headers=...). If the "
-            "same URL doesn't open in a browser on this network either, the IP itself is "
-            "blocked and no header change will help."
+            "or send different headers via RanobeLib(..., headers=...) / "
+            "Catalog(headers=...). If the same URL doesn't open in a browser on this network "
+            "either, the IP itself is blocked and no header change will help."
         )
 
 

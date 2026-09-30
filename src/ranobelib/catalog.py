@@ -7,6 +7,7 @@ its own ``ApiClient``/``DiskCache`` rather than a method on ``RanobeLib``.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from types import TracebackType
 from typing import Any, Self
@@ -40,6 +41,7 @@ class Catalog:
         *,
         cache_dir: str | Path | None = None,
         cache_ttl: float | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         """Initialize the catalog client.
 
@@ -51,8 +53,10 @@ class Catalog:
             cache_ttl: Seconds after which a cached page is treated as stale and re-fetched.
                 ``None`` (the default) means cached pages never expire on their own — see
                 ``refresh=True`` on ``list_titles()`` to force one anyway.
+            headers: Extra HTTP headers merged over the SDK's defaults, same as
+                ``RanobeLib(headers=...)`` — see there.
         """
-        self._client = ApiClient()
+        self._client = ApiClient(headers=headers)
         self._cache = DiskCache(
             cache_dir if cache_dir is not None else DEFAULT_CACHE_DIR, ttl=cache_ttl
         )
