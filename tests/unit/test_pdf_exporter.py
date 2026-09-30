@@ -13,6 +13,7 @@ import httpx
 import pytest
 from pypdf import PdfReader
 
+from ranobelib._http import BROWSER_HEADERS
 from ranobelib.exporters import EXPORTERS
 from ranobelib.exporters.pdf import _chapter_html, _data_uri, _title_page_html, weasyprint
 from ranobelib.models import Chapter, Cover, Label, Title
@@ -151,6 +152,35 @@ async def test_pdf_exporter_skips_failed_cover_download(tmp_path: Path) -> None:
     await PdfExporter(transport=httpx.MockTransport(handler)).export(title, [], output_path)
 
     assert output_path.read_bytes().startswith(b"%PDF")
+
+
+@needs_weasyprint
+async def test_pdf_exporter_downloads_images_with_browser_headers(tmp_path: Path) -> None:
+    from ranobelib.exporters.pdf import PdfExporter
+
+    requested: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request)
+        return httpx.Response(404)
+
+    title = _title(cover=Cover(default="https://cover.example/cover.jpg"))
+    chapter = _chapter(
+        volume="1", number="1", name=None, content='<p><img src="https://img.example/a.png"></p>'
+    )
+
+    await PdfExporter(transport=httpx.MockTransport(handler)).export(
+        title, [chapter], tmp_path / "out.pdf"
+    )
+
+    assert {str(request.url) for request in requested} == {
+        "https://cover.example/cover.jpg",
+        "https://img.example/a.png",
+    }
+    for request in requested:
+        for name, value in BROWSER_HEADERS.items():
+            assert request.headers[name] == value
+        assert "Site-Id" not in request.headers
 
 
 @needs_weasyprint

@@ -15,6 +15,7 @@ import httpx
 import pytest
 from ebooklib import epub as ebooklib_epub
 
+from ranobelib._http import BROWSER_HEADERS
 from ranobelib.exporters import EXPORTERS
 from ranobelib.exporters.epub import EpubExporter, extract_image_urls, rewrite_image_srcs
 from ranobelib.models import Chapter, Cover, Label, Title
@@ -183,6 +184,32 @@ async def test_epub_exporter_skips_cover_on_any_http_error(
     book = ebooklib_epub.read_epub(str(output_path))
     file_names = {item.file_name for item in book.get_items()}
     assert "cover.jpg" not in file_names
+
+
+async def test_epub_exporter_downloads_images_with_browser_headers(tmp_path: Path) -> None:
+    requested: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request)
+        return httpx.Response(200, content=b"IMAGEBYTES")
+
+    title = _title(cover=Cover(default="https://cover.example/cover.jpg"))
+    chapter = _chapter(
+        volume="1", number="1", name=None, content='<p><img src="https://img.example/a.png"></p>'
+    )
+
+    await EpubExporter(transport=httpx.MockTransport(handler)).export(
+        title, [chapter], tmp_path / "out.epub"
+    )
+
+    assert {str(request.url) for request in requested} == {
+        "https://cover.example/cover.jpg",
+        "https://img.example/a.png",
+    }
+    for request in requested:
+        for name, value in BROWSER_HEADERS.items():
+            assert request.headers[name] == value
+        assert "Site-Id" not in request.headers
 
 
 async def test_epub_exporter_calls_on_chapter_once_per_chapter(tmp_path: Path) -> None:
