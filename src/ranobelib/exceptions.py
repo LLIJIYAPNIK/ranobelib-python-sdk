@@ -153,6 +153,34 @@ class AuthRequiredError(RanobeLibError):
         super().__init__(f"Authorization required to access: {url}")
 
 
+class AccessBlockedError(RanobeLibError):
+    """Raised when the site's edge protection rejects a request before it reaches the API.
+
+    Not an authorization problem, unlike ``AuthRequiredError``: the DDoS-Guard edge in front
+    of api.cdnlibs.org answers with an HTML 403 page (the API's own 403 is JSON) when it
+    doesn't like the request — so far, a missing ranobelib.me ``Referer`` (see
+    docs/api-notes.md, section "WAF 403"). The SDK already sends browser-like headers, so
+    seeing this means either the edge changed its rules — check for an SDK update, or, when
+    using ``ranobelib.client.ApiClient`` directly, pass different headers via its
+    ``headers=`` (``RanobeLib``/``Catalog`` don't forward it) — or the edge is blocking the
+    network/IP itself, which no header fixes. Not retried: resending the same request gets
+    the same answer.
+
+    Attributes:
+        url: The request URL that returned 403.
+    """
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        super().__init__(
+            f"Request blocked by the site's protection (not an authorization issue): {url}. "
+            "The site may have changed which requests it accepts: check for an SDK update, "
+            "or send different headers via ranobelib.client.ApiClient(headers=...). If the "
+            "same URL doesn't open in a browser on this network either, the IP itself is "
+            "blocked and no header change will help."
+        )
+
+
 class RateLimitError(RanobeLibError):
     """Raised when the API responds with 429 Too Many Requests.
 

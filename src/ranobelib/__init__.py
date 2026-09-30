@@ -2,6 +2,7 @@
 
 from ranobelib.catalog import Catalog
 from ranobelib.exceptions import (
+    AccessBlockedError,
     AmbiguousChapter,
     AuthRequiredError,
     ChapterNotFoundError,
@@ -27,6 +28,7 @@ from ranobelib.sdk import RanobeLib
 from ranobelib.sizing import chapter_size, volume_size
 
 __all__ = [
+    "AccessBlockedError",
     "AmbiguousChapter",
     "AuthRequiredError",
     "Catalog",

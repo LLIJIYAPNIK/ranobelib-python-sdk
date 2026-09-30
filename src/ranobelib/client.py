@@ -12,6 +12,7 @@ import httpx
 
 from ranobelib._http import BROWSER_HEADERS
 from ranobelib.exceptions import (
+    AccessBlockedError,
     AuthRequiredError,
     ChapterNotFoundError,
     RanobeLibError,
@@ -319,6 +320,12 @@ class ApiClient:
         if response.status_code == 404:
             raise not_found
         if response.status_code == 403:
+            # The API's own 403 is JSON; the DDoS-Guard edge in front of it answers with an
+            # HTML page instead. Told apart by Content-Type, not by the page's wording, which
+            # can change (see docs/api-notes.md, section "WAF 403").
+            media_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+            if media_type != "application/json":
+                raise AccessBlockedError(str(response.request.url))
             raise AuthRequiredError(str(response.request.url))
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
