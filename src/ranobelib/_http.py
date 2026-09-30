@@ -22,8 +22,8 @@ BROWSER_HEADERS: dict[str, str] = {
 """Headers a browser on ranobelib.me sends, so requests look like they come from the site.
 
 The DDoS-Guard edge in front of api.cdnlibs.org and cover.cdnlibs.org rejects requests
-without a ranobelib.me ``Referer`` with an HTML 403 page (see docs/api-notes.md, section
-"WAF 403"). ``Referer`` alone was enough when checked; ``Origin`` and a real browser
-``User-Agent`` are sent too so the request as a whole matches what the site itself sends,
-rather than advertising ``python-httpx``.
+without a non-empty ``Referer`` with an HTML 403 page (see docs/api-notes.md, section
+"WAF 403"). Any ``Referer`` value was enough when checked; the site's own one is sent,
+together with ``Origin`` and a real browser ``User-Agent``, so the request as a whole matches
+what the site itself sends rather than advertising ``python-httpx``.
 """

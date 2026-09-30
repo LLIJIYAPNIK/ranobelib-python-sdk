@@ -72,7 +72,7 @@ class EpubExporter:
         for author in title.authors:
             book.add_author(author.name)
 
-        # Browser headers: cover.cdnlibs.org's edge answers requests without a ranobelib.me
+        # Browser headers: cover.cdnlibs.org's edge answers requests without a (non-empty)
         # Referer with a 403, same as the API (see docs/api-notes.md, section "WAF 403").
         async with httpx.AsyncClient(
             timeout=15.0,

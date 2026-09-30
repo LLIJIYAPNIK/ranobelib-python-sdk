@@ -40,7 +40,7 @@ class ApiClient:
     manual implementation was chosen over a dependency like ``tenacity`` for this.
 
     Every request carries browser-like ``Origin``/``Referer``/``User-Agent`` headers on top
-    of the API-specific ``Site-Id``/``Accept``: without a ranobelib.me ``Referer``, the
+    of the API-specific ``Site-Id``/``Accept``: without a non-empty ``Referer``, the
     DDoS-Guard edge in front of the API answers every request with an HTML 403 page (see
     docs/api-notes.md, section "WAF 403").
     """

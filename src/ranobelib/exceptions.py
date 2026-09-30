@@ -158,7 +158,7 @@ class AccessBlockedError(RanobeLibError):
 
     Not an authorization problem, unlike ``AuthRequiredError``: the DDoS-Guard edge in front
     of api.cdnlibs.org answers with an HTML 403 page (the API's own 403 is JSON) when it
-    doesn't like the request — so far, a missing ranobelib.me ``Referer`` (see
+    doesn't like the request — so far, a missing or empty ``Referer`` (see
     docs/api-notes.md, section "WAF 403"). The SDK already sends browser-like headers, so
     seeing this means either the edge changed its rules — check for an SDK update, or, when
     using ``ranobelib.client.ApiClient`` directly, pass different headers via its
