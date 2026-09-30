@@ -11,6 +11,7 @@ from typing import ClassVar
 
 import httpx
 
+from ranobelib._http import BROWSER_HEADERS
 from ranobelib.exporters import register
 from ranobelib.exporters._illustrations import (
     download_images,
@@ -120,8 +121,12 @@ if weasyprint is not None:
             Returns:
                 ``output_path``.
             """
+            # Browser headers for the cover CDN's edge — see the same comment in epub.py.
             async with httpx.AsyncClient(
-                timeout=15.0, follow_redirects=True, transport=self._transport
+                timeout=15.0,
+                follow_redirects=True,
+                transport=self._transport,
+                headers=BROWSER_HEADERS,
             ) as client:
                 cover_url = pick_cover_url(title.cover)
                 cover_data_uri = None

@@ -10,6 +10,7 @@ from typing import ClassVar
 import httpx
 from ebooklib import epub
 
+from ranobelib._http import BROWSER_HEADERS
 from ranobelib.exporters import register
 from ranobelib.exporters._illustrations import (
     download_images,
@@ -71,8 +72,13 @@ class EpubExporter:
         for author in title.authors:
             book.add_author(author.name)
 
+        # Browser headers: cover.cdnlibs.org's edge answers requests without a ranobelib.me
+        # Referer with a 403, same as the API (see docs/api-notes.md, section "WAF 403").
         async with httpx.AsyncClient(
-            timeout=15.0, follow_redirects=True, transport=self._transport
+            timeout=15.0,
+            follow_redirects=True,
+            transport=self._transport,
+            headers=BROWSER_HEADERS,
         ) as client:
             cover_url = pick_cover_url(title.cover)
             if cover_url is not None:
