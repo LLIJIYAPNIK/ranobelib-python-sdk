@@ -14,7 +14,7 @@ from typing import Any, Self
 
 from ranobelib.cache import DEFAULT_CACHE_DIR, DiskCache
 from ranobelib.client import RANOBELIB_SITE_ID, ApiClient
-from ranobelib.models import CatalogPage, Country, Genre, Title
+from ranobelib.models import CatalogPage, Country, Genre, Label, Title
 
 DEFAULT_SORT = "last_chapter_at"
 """Default sort order: title's last-chapter timestamp — the closest real equivalent to
@@ -30,7 +30,7 @@ class Catalog:
     Example:
         ```python
         async with Catalog() as catalog:
-            page = await catalog.list_titles(query="dxd", genres=[34], status=1)
+            page = await catalog.list_titles(query="dxd", genres=[34], statuses=[1])
             for title in page.items:
                 print(title.name)
         ```
@@ -84,7 +84,7 @@ class Catalog:
         query: str | None = None,
         genres: list[int] | None = None,
         tags: list[int] | None = None,
-        status: int | None = None,
+        statuses: list[int] | None = None,
         countries: list[int] | None = None,
         sort: str = DEFAULT_SORT,
         refresh: bool = False,
@@ -107,7 +107,10 @@ class Catalog:
                 against the live API, see docs/api-notes.md; not the OR some might expect
                 from tags being more numerous/specific than genres). Also not validated
                 before sending, same as ``genres``.
-            status: A single ``Title.status.id`` to filter by (e.g. ongoing vs. completed).
+            statuses: ``Title.status.id``s to filter by (e.g. ongoing, completed). A title
+                matches if its own status is *any* of these (OR, same as ``countries`` — a
+                title only has one status, see docs/api-notes.md). ``None`` or an empty list
+                applies no status filter. Ids come from ``list_statuses()``.
             countries: ``Country.id``s to filter by. A title matches if its own country is
                 *any* of these (OR, not AND like ``genres``/``tags`` — a title only has one
                 country of origin, so requiring all of them could never match past the first,
@@ -146,7 +149,7 @@ class Catalog:
             query=query,
             genres=genres,
             tags=tags,
-            status=status,
+            statuses=statuses,
             countries=countries,
             sort=sort,
         )
@@ -161,7 +164,7 @@ class Catalog:
             query=query,
             genres=genres,
             tags=tags,
-            status=status,
+            statuses=statuses,
             countries=countries,
             sort=sort,
         )
@@ -223,6 +226,33 @@ class Catalog:
         self._cache.set(key, data)
         return _build_countries(data)
 
+    async def list_statuses(self, *, refresh: bool = False) -> list[Label]:
+        """Fetch the full list of title statuses (id → label), for use as filter options
+        with ``list_titles(statuses=...)``.
+
+        Mirrors ``list_genres()``/``list_countries()``: the underlying endpoint
+        (``GET /api/constants?fields[]=status``) isn't site-scoped, so entries not tagged for
+        ranobelib.me are dropped before returning (see docs/api-notes.md). Returns the same
+        ``Label`` model as ``Title.status``, so a title's status can be compared against
+        these directly.
+
+        Args:
+            refresh: Bypass the disk cache and re-fetch from the API even if the status list
+                was already cached.
+
+        Returns:
+            Every status (``Label``: id, label) that applies to ranobelib.me.
+        """
+        key = "catalog:statuses"
+        if not refresh:
+            cached = self._cache.get(key)
+            if cached is not None:
+                return _build_statuses(cached)
+
+        data = await self._client.list_statuses()
+        self._cache.set(key, data)
+        return _build_statuses(data)
+
 
 def _cache_key(
     *,
@@ -231,16 +261,17 @@ def _cache_key(
     query: str | None,
     genres: list[int] | None,
     tags: list[int] | None,
-    status: int | None,
+    statuses: list[int] | None,
     countries: list[int] | None,
     sort: str,
 ) -> str:
     genres_part = ",".join(str(genre_id) for genre_id in genres or [])
     tags_part = ",".join(str(tag_id) for tag_id in tags or [])
+    statuses_part = ",".join(str(status_id) for status_id in statuses or [])
     countries_part = ",".join(str(country_id) for country_id in countries or [])
     return (
         f"catalog:{page}:{per_page}:{query or ''}:{genres_part}:{tags_part}:"
-        f"{status}:{countries_part}:{sort}"
+        f"{statuses_part}:{countries_part}:{sort}"
     )
 
 
@@ -258,3 +289,8 @@ def _build_genres(data: list[dict[str, Any]]) -> list[Genre]:
 def _build_countries(data: list[dict[str, Any]]) -> list[Country]:
     site_id = int(RANOBELIB_SITE_ID)
     return [Country.model_validate(item) for item in data if site_id in item.get("site_ids", [])]
+
+
+def _build_statuses(data: list[dict[str, Any]]) -> list[Label]:
+    site_id = int(RANOBELIB_SITE_ID)
+    return [Label.model_validate(item) for item in data if site_id in item.get("site_ids", [])]
