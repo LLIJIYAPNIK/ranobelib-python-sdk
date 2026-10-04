@@ -773,6 +773,31 @@ several statuses at once.
   `statuses: list[int] | None` — not kept as a deprecated alias, same call as `country` →
   `countries` in issue #55 below. `None` or an empty list omits `status[]` entirely.
 
+**Chapter-count filter — `chap_count_min`/`chap_count_max` (issue #69, checked
+2026-10-04):**
+
+Issue #69 (companion app's mobile catalog filters: «Количество глав» — «от 100» / «от 500» /
+«от 1000») asked for a minimum chapter count, plus a maximum if the API has one. The parameter
+names weren't guessed: the site's own JS bundle declares its catalog filter schema with
+`chap_count_min`/`chap_count_max` (next to `year_min`/`year_max`, `rating_min`/`rating_max`,
+...). Checked against the live API — the listing items don't carry a chapter count, so each
+result's count was looked up through `GET /api/manga/{slug_url}?fields[]=chap_count`:
+
+- Both bounds are **inclusive** and count `items_count.uploaded` — the same number as
+  `Title.chapter_count`. `chap_count_min=1000&sort_by=chap_count&sort_type=asc` starts at
+  titles with exactly 1000 chapters; `chap_count_max=100&sort_by=chap_count` (desc) starts at
+  exactly 100; `chap_count_min=308&chap_count_max=308` includes `6712--high-school-dxd-novel`
+  (308 chapters). `chap_count_min=100&chap_count_max=500` ascending starts at 100.
+- Validated server-side: a negative value is 422 (`"... должно быть не менее 0."`), a
+  non-integer (`abc`, `1.5`) is 422 (`"... должно быть целым числом."`). `0` is accepted,
+  and `chap_count_max=0` returns titles with no chapters yet.
+- **`min > max` is silently swapped**, not rejected: `chap_count_min=500&chap_count_max=100`
+  gives the same 100..500 range (ascending starts at 100, descending at 500). The SDK
+  doesn't rely on that undocumented behavior: `Catalog.list_titles(min_chapters=...,
+  max_chapters=...)` raises `ValueError` for `min > max` and for negative values before any
+  request, same as it already does for `page`/`per_page`.
+- A bound above every title (`chap_count_min=99999999`) is 200 with an empty page.
+
 **Country/origin filter — `types[]`, not `country`/`countries[]` (issue #48):**
 
 Issue #48 (companion app's catalog filter sidebar needs a country-of-origin filter, same

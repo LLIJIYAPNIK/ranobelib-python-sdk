@@ -62,6 +62,15 @@ async def main() -> None:
         for title in mixed:
             print(f"  {title.id}: {title.name} ({title.status.label})")
 
+        # `min_chapters`/`max_chapters` bound the chapter count, both inclusive (the same
+        # number as Title.chapter_count) — e.g. a «от 1000 глав» filter is min_chapters=1000.
+        # Catalog items themselves don't carry that count (only get_info() does), so the
+        # result is sorted by it here to make the order meaningful: longest titles first.
+        long_page = await catalog.list_titles(min_chapters=1000, sort="chap_count", per_page=10)
+        print("\n5 titles with 1000+ chapters (most chapters first):")
+        for title in long_page.items[:5]:
+            print(f"  {title.id}: {title.name}")
+
         # `list_countries()` is the id -> name lookup for the `countries` filter below, same
         # pattern as `list_genres()` above (network-wide constants endpoint, filtered down to
         # ranobelib.me by Catalog). Despite the name, this covers more than literal countries
@@ -119,6 +128,7 @@ asyncio.run(main())
 # site changing, not a bug):
 #
 #
+#
 # page 1, has_next_page=True
 #   261856: DxD : A Nameless Star (Онгоинг)
 #   272504: DxD: Хранитель великой оружейной (Онгоинг)
@@ -143,6 +153,13 @@ asyncio.run(main())
 #   33503: 死于伟贤 (Novel) (Онгоинг)
 #   45925: 人類或不朽的龍皇 (Novel) (Завершён)
 #   227524: √4: Uchi no Juunin wa Minna Ijou desu (Завершён)
+#
+# 5 titles with 1000+ chapters (most chapters first):
+#   206937: Dūshì jípǐn yī shén
+#   16784: Di Ba
+#   7058: Xiu Luo Wu Shen
+#   38871: Qiángdà de xiǎoshān nóng (Novel)
+#   18612: Àoshì dān shén
 #
 # 6 countries available: ['Япония', 'Корея', 'Китай', 'Английский', 'Авторский', 'Фанфик']
 #
