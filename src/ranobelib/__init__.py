@@ -21,6 +21,7 @@ from ranobelib.models import (
     Country,
     Footnote,
     Genre,
+    Label,
     Title,
     Volume,
 )
@@ -40,6 +41,7 @@ __all__ = [
     "DownloadTitleInterruptedError",
     "Footnote",
     "Genre",
+    "Label",
     "MultipleTitleTranslationsError",
     "MultipleTranslationsError",
     "RanobeLib",

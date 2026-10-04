@@ -189,7 +189,7 @@ class ApiClient:
         query: str | None,
         genres: list[int] | None,
         tags: list[int] | None,
-        status: int | None,
+        statuses: list[int] | None,
         countries: list[int] | None,
         sort: str,
     ) -> dict[str, Any]:
@@ -209,7 +209,9 @@ class ApiClient:
                 see docs/api-notes.md), not just any one.
             tags: Tag ids to filter by. Same AND semantics as ``genres`` — a title must have
                 *all* of them, not just any one (see docs/api-notes.md).
-            status: A single ``Title.status.id`` to filter by.
+            statuses: ``Title.status.id``s to filter by. A title matches if its own status
+                is *any* of these (OR, like ``countries`` — a title only has one status, see
+                docs/api-notes.md). Sent on the wire as repeated ``status[]`` parameters.
             countries: ``Country.id``s to filter by. A title matches if its own country is
                 *any* of these (OR, not AND like ``genres``/``tags`` — a title only has one
                 country, confirmed against the live API, see docs/api-notes.md). Sent on the
@@ -235,8 +237,8 @@ class ApiClient:
             params.append(("genres[]", str(genre_id)))
         for tag_id in tags or []:
             params.append(("tags[]", str(tag_id)))
-        if status is not None:
-            params.append(("status[]", str(status)))
+        for status_id in statuses or []:
+            params.append(("status[]", str(status_id)))
         for country_id in countries or []:
             params.append(("types[]", str(country_id)))
 
@@ -281,6 +283,23 @@ class ApiClient:
         response = await self._get("/constants", params=httpx.QueryParams([("fields[]", "types")]))
         self._raise_for_status(response, not_found=RanobeLibError("Unexpected 404 from type list"))
         data: list[dict[str, Any]] = response.json()["data"]["types"]
+        return data
+
+    async def list_statuses(self) -> list[dict[str, Any]]:
+        """Fetch the raw title status list shared across the whole lib.social network.
+
+        Same shape and caveats as ``list_genres``: not site-scoped by any request parameter,
+        returns every status known to the network at once, each tagged with the site ids it
+        applies to via ``site_ids``.
+
+        Returns:
+            The raw ``data.status`` array from the API response, unfiltered by site.
+        """
+        response = await self._get("/constants", params=httpx.QueryParams([("fields[]", "status")]))
+        self._raise_for_status(
+            response, not_found=RanobeLibError("Unexpected 404 from status list")
+        )
+        data: list[dict[str, Any]] = response.json()["data"]["status"]
         return data
 
     async def _get(self, url: str, *, params: Any = None) -> httpx.Response:

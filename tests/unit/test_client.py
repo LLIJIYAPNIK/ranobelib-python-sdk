@@ -109,7 +109,7 @@ _CATALOG_CALL_KWARGS: dict[str, Any] = {
     "query": None,
     "genres": None,
     "tags": None,
-    "status": None,
+    "statuses": None,
     "countries": None,
     "sort": "last_chapter_at",
 }
@@ -133,6 +133,7 @@ def _edge_403(request: httpx.Request) -> httpx.Response:
         pytest.param(lambda client: client.list_titles(**_CATALOG_CALL_KWARGS), id="catalog"),
         pytest.param(lambda client: client.list_genres(), id="genres"),
         pytest.param(lambda client: client.list_countries(), id="countries"),
+        pytest.param(lambda client: client.list_statuses(), id="statuses"),
     ],
 )
 async def test_html_403_raises_access_blocked_not_auth_required(
@@ -292,7 +293,7 @@ async def test_list_titles_sends_expected_query_params() -> None:
         assert request.url.params["q"] == "dxd"
         assert request.url.params.get_list("genres[]") == ["34", "35"]
         assert request.url.params.get_list("tags[]") == ["218", "232"]
-        assert request.url.params.get_list("status[]") == ["1"]
+        assert request.url.params.get_list("status[]") == ["1", "2"]
         assert request.url.params.get_list("types[]") == ["10", "11"]
         return httpx.Response(200, json={"data": [], "meta": {}})
 
@@ -303,7 +304,7 @@ async def test_list_titles_sends_expected_query_params() -> None:
             query="dxd",
             genres=[34, 35],
             tags=[218, 232],
-            status=1,
+            statuses=[1, 2],
             countries=[10, 11],
             sort="last_chapter_at",
         )
@@ -325,7 +326,7 @@ async def test_list_titles_omits_optional_params_when_not_given() -> None:
             query=None,
             genres=None,
             tags=None,
-            status=None,
+            statuses=None,
             countries=None,
             sort="name",
         )
@@ -344,7 +345,7 @@ async def test_list_titles_returns_full_response_body() -> None:
             query=None,
             genres=None,
             tags=None,
-            status=None,
+            statuses=None,
             countries=None,
             sort="name",
         )
@@ -364,7 +365,7 @@ async def test_list_titles_raises_rate_limit_error_on_429() -> None:
                 query=None,
                 genres=None,
                 tags=None,
-                status=None,
+                statuses=None,
                 countries=None,
                 sort="name",
             )
@@ -382,7 +383,7 @@ async def test_list_titles_wraps_validation_error_in_ranobelib_error() -> None:
                 query=None,
                 genres=None,
                 tags=None,
-                status=None,
+                statuses=None,
                 countries=None,
                 sort="bogus",
             )
@@ -431,7 +432,7 @@ async def test_list_titles_sends_countries_as_repeated_types_query_param() -> No
             query=None,
             genres=None,
             tags=None,
-            status=None,
+            statuses=None,
             countries=[10, 11],
             sort="name",
         )
@@ -449,7 +450,7 @@ async def test_list_titles_sends_tags_query_param() -> None:
             query=None,
             genres=None,
             tags=[218],
-            status=None,
+            statuses=None,
             countries=None,
             sort="name",
         )
@@ -484,6 +485,37 @@ async def test_list_countries_raises_rate_limit_error_on_429() -> None:
     async with _client(handler) as client:
         with pytest.raises(RateLimitError):
             await client.list_countries()
+
+
+async def test_list_statuses_sends_expected_query_params() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/constants"
+        assert request.url.params.get_list("fields[]") == ["status"]
+        return httpx.Response(200, json={"data": {"status": []}})
+
+    async with _client(handler) as client:
+        await client.list_statuses()
+
+
+async def test_list_statuses_returns_raw_status_array() -> None:
+    statuses = [{"id": 1, "label": "Онгоинг", "site_ids": [0, 1, 2, 3, 4, 5]}]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": {"status": statuses}})
+
+    async with _client(handler) as client:
+        result = await client.list_statuses()
+
+    assert result == statuses
+
+
+async def test_list_statuses_raises_rate_limit_error_on_429() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, json={"data": {}})
+
+    async with _client(handler) as client:
+        with pytest.raises(RateLimitError):
+            await client.list_statuses()
 
 
 async def test_aclose_without_context_manager() -> None:

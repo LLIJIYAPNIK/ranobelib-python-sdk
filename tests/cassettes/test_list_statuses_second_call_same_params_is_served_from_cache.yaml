@@ -1,0 +1,75 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      host:
+      - api.cdnlibs.org
+      origin:
+      - https://ranobelib.me
+      referer:
+      - https://ranobelib.me/
+      site-id:
+      - '3'
+      user-agent:
+      - Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15
+        (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/constants?fields%5B%5D=status
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAEA4WQQQrDIBBFr1JmPYuYGWnrVdpQDFoQsotZBe9enIFGLCWbv/jgm+ffIfjswe2w
+        Zp+3FdxjhxTAGYTFz3EBB89tYBNrUpAkSW1ubQ8Ia8rxlUIFDWhwREJGOxVU7Nhhr/J8kBwlbU2W
+        hgVujfThHE4dXLHq3PizOUdxh3ofVqRfFiCLG6v57znt5+Nf9O8X34Fsd1gQrAiVkPX1MPmLsFs7
+        2Y9846tb3mtzsuVUplI+oT9/YRMCAAA=
+    headers:
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-origin:
+      - https://ranobelib.me
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Sun, 04 Oct 2026 12:59:25 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=mHd1BO1ATkkL16Pt; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:19:25 GMT
+      - __ddg10_=1791118765; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:19:25 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:19:25 GMT
+      - __ddg1_=JlpqBZy5Sw34yrDEJ2Tu; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Mon,
+        04-Oct-2027 12:59:25 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '95'
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

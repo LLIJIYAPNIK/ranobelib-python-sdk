@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from ranobelib import Catalog, CatalogPage, Country, Genre, Title
+from ranobelib import Catalog, CatalogPage, Country, Genre, Label, Title
 
 
 @pytest.mark.vcr
@@ -29,10 +29,21 @@ async def test_list_titles_returns_matching_titles() -> None:
 @pytest.mark.vcr
 async def test_list_titles_filters_by_status() -> None:
     async with Catalog() as catalog:
-        page = await catalog.list_titles(status=1, per_page=10)
+        page = await catalog.list_titles(statuses=[1], per_page=10)
 
     assert page.items
     assert all(item.status.id == 1 for item in page.items)
+
+
+@pytest.mark.vcr
+async def test_list_titles_statuses_filter_uses_or_not_and_semantics() -> None:
+    async with Catalog() as catalog:
+        # 1 = ongoing, 2 = completed (see docs/api-notes.md, "Status filter"). OR, same as
+        # `countries` — a title only has one status. Confirmed by checking both ids show up
+        # in the combined results, not just one.
+        page = await catalog.list_titles(statuses=[1, 2], per_page=60, sort="name")
+
+    assert {item.status.id for item in page.items} == {1, 2}
 
 
 @pytest.mark.vcr
@@ -59,9 +70,9 @@ async def test_list_titles_countries_filter_uses_or_not_and_semantics() -> None:
 
 
 @pytest.mark.vcr
-async def test_list_titles_filters_by_genres_and_status_combined() -> None:
+async def test_list_titles_filters_by_genres_and_statuses_combined() -> None:
     async with Catalog() as catalog:
-        page = await catalog.list_titles(genres=[34], status=1, per_page=10)
+        page = await catalog.list_titles(genres=[34], statuses=[1], per_page=10)
 
     assert isinstance(page, CatalogPage)
     assert all(item.status.id == 1 for item in page.items)
@@ -104,7 +115,7 @@ async def test_list_titles_pagination_advances_to_different_items() -> None:
 @pytest.mark.vcr
 async def test_list_titles_page_past_the_end_returns_empty_with_no_more_pages() -> None:
     async with Catalog() as catalog:
-        page = await catalog.list_titles(page=99999, status=1, per_page=10)
+        page = await catalog.list_titles(page=99999, statuses=[1], per_page=10)
 
     assert page.items == []
     assert page.has_next_page is False
@@ -153,7 +164,7 @@ async def test_list_genres_returns_genres_with_id_and_name() -> None:
     assert all(isinstance(genre, Genre) for genre in genres)
     assert all(genre.id and genre.name for genre in genres)
     # Genre 34 is used elsewhere in this test suite as a `list_titles(genres=[34])` filter
-    # value (see test_list_titles_filters_by_genres_and_status_combined) — confirm it
+    # value (see test_list_titles_filters_by_genres_and_statuses_combined) — confirm it
     # resolves to a real name here.
     assert any(genre.id == 34 and genre.name == "Боевик" for genre in genres)
 
@@ -231,5 +242,40 @@ async def test_list_countries_refresh_bypasses_cache(tmp_path: Path, vcr: object
     async with Catalog(cache_dir=tmp_path) as catalog:
         await catalog.list_countries()
         await catalog.list_countries(refresh=True)
+
+    assert len(vcr.requests) == 2  # type: ignore[attr-defined]
+
+
+@pytest.mark.vcr
+async def test_list_statuses_returns_statuses_with_id_and_label() -> None:
+    async with Catalog() as catalog:
+        statuses = await catalog.list_statuses()
+
+    assert statuses
+    assert all(isinstance(status, Label) for status in statuses)
+    assert all(status.id and status.label for status in statuses)
+    # Ids 1 and 2 are used as `list_titles(statuses=[...])` filter values elsewhere in this
+    # test suite — confirm they resolve to the labels Title.status carries for them.
+    assert Label(id=1, label="Онгоинг") in statuses
+    assert Label(id=2, label="Завершён") in statuses
+
+
+@pytest.mark.vcr
+async def test_list_statuses_second_call_same_params_is_served_from_cache(
+    tmp_path: Path, vcr: object
+) -> None:
+    async with Catalog(cache_dir=tmp_path) as catalog:
+        first = await catalog.list_statuses()
+        second = await catalog.list_statuses()
+
+    assert first == second
+    assert len(vcr.requests) == 1  # type: ignore[attr-defined]
+
+
+@pytest.mark.vcr
+async def test_list_statuses_refresh_bypasses_cache(tmp_path: Path, vcr: object) -> None:
+    async with Catalog(cache_dir=tmp_path) as catalog:
+        await catalog.list_statuses()
+        await catalog.list_statuses(refresh=True)
 
     assert len(vcr.requests) == 2  # type: ignore[attr-defined]

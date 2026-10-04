@@ -1,4 +1,4 @@
-"""List/search the ranobelib.me catalog with Catalog.list_titles()/list_genres()/list_countries().
+"""List/search the ranobelib.me catalog with Catalog.list_titles() and its filter lookups.
 
 Catalog is a separate entry point from RanobeLib: browsing/searching the whole site isn't
 scoped to any one title, so it doesn't belong on the class that's built around a title's URL.
@@ -32,7 +32,7 @@ async def main() -> None:
         print(f"{len(genres)} genres available, e.g.: {[genre.name for genre in genres[:5]]}")
         action_genre = next(genre for genre in genres if genre.name == "Боевик")
 
-        # `genres`/`status` filter narrows results; `genres` is a list of ids because a
+        # `genres` filter narrows results; `genres` is a list of ids because a
         # title can be filtered by more than one at once (it must have *all* of them, not
         # just any one — see docs/api-notes.md). Ids come from list_genres() above, or from
         # the site's own filter UI.
@@ -41,10 +41,26 @@ async def main() -> None:
         for title in action_page.items[:5]:
             print(f"  {title.id}: {title.name}")
 
-        completed_page = await catalog.list_titles(status=2, per_page=10)
-        print(f"\n{len(completed_page.items)} completed titles on page 1:")
-        for title in completed_page.items[:5]:
-            print(f"  {title.id}: {title.name}")
+        # `list_statuses()` is the id -> label lookup for the `statuses` filter, same pattern
+        # as `list_genres()` above. It returns the same `Label` model as `Title.status`, so
+        # a title's status compares equal to the matching entry here.
+        statuses = await catalog.list_statuses()
+        print(f"\n{len(statuses)} statuses available: {[status.label for status in statuses]}")
+        ongoing = next(status for status in statuses if status.label == "Онгоинг")
+        completed = next(status for status in statuses if status.label == "Завершён")
+
+        # `statuses` is a list too, but OR (not AND like `genres`): a title has exactly one
+        # status, so "ongoing or completed" is the only reading that can match anything.
+        status_page = await catalog.list_titles(
+            statuses=[ongoing.id, completed.id], per_page=60, sort="name"
+        )
+        print(f"\n5 {ongoing.label} or {completed.label} titles (mixed):")
+        mixed = [
+            *[title for title in status_page.items if title.status == ongoing][:3],
+            *[title for title in status_page.items if title.status == completed][:2],
+        ]
+        for title in mixed:
+            print(f"  {title.id}: {title.name} ({title.status.label})")
 
         # `list_countries()` is the id -> name lookup for the `countries` filter below, same
         # pattern as `list_genres()` above (network-wide constants endpoint, filtered down to
@@ -102,36 +118,40 @@ asyncio.run(main())
 # genre list can change too, so the exact ids/names here will drift over time — that's the
 # site changing, not a bug):
 #
+#
 # page 1, has_next_page=True
 #   261856: DxD : A Nameless Star (Онгоинг)
+#   272504: DxD: Хранитель великой оружейной (Онгоинг)
 #   65799: DXD: Isekai Driver's Multiverse Retirement (Novel) (Завершён)
 #   256087: DxD: Gambling With Fate (Онгоинг)
-#   257880: DxD : Draconic Rebellion (Онгоинг)
-#   248229: DxD: The Replication System! (Онгоинг)
+#   257880: DXD : Draconic Rebellion (Онгоинг)
 # 54 genres available, e.g.: ['Арт', 'Безумие', 'Боевик', 'Боевые искусства', 'Вампиры']
 #
 # 5 'Боевик' titles:
-#   271317: Isegye Geomeun Meori Oegugin
-#   268176: baedeu ending meikeo
-#   25089: Jaeang-geub yeong-ungnim-i gwihwanhasyeossda
-#   251723: I found a dragon egg
-#   237642: Mòshì tiānzāi: Cóng dǎzào bìnàn suǒ kāishǐ
+#   206818: oneulman saneun gisa
+#   97937: Wǒ néng fùzhì tiānfù
+#   184704: My Longevity Simulation (Novel)
+#   273576: Zhe Ge Sha Shou Shi Zhui Xu
+#   132390: I will Heal you with the Academy Convenience Store (Novel)
 #
-# 10 completed titles on page 1:
-#   244924: guwon, geu janhogham-e daehayeo
-#   271058: Kuàichuān gōnglüè: Yāoniè sùzhǔ, kāiguà le
-#   57693: don-eulo yaghonjaleul
-#   271317: Isegye Geomeun Meori Oegugin
-#   268176: baedeu ending meikeo
+# 5 statuses available: ['Онгоинг', 'Завершён', 'Анонс', 'Приостановлен', 'Выпуск
+# прекращён']
+#
+# 5 Онгоинг or Завершён titles (mixed):
+#   16498: 잔여 포인트 999999999999P (Novel) (Онгоинг)
+#   84055: 생존의 기회 (Novel) (Онгоинг)
+#   33503: 死于伟贤 (Novel) (Онгоинг)
+#   45925: 人類或不朽的龍皇 (Novel) (Завершён)
+#   227524: √4: Uchi no Juunin wa Minna Ijou desu (Завершён)
 #
 # 6 countries available: ['Япония', 'Корея', 'Китай', 'Английский', 'Авторский', 'Фанфик']
 #
 # 5 titles from Корея:
-#   244924: guwon, geu janhogham-e daehayeo
-#   57693: don-eulo yaghonjaleul
-#   49961: Geumbal-ui jeonglyeongs
-#   267643: lopan sog haegunjedog-i doeeossda
-#   271317: Isegye Geomeun Meori Oegugin
+#   187014: apokallibseu syelteo gwanlija (Novel)
+#   206818: oneulman saneun gisa
+#   271255: Seongnyeoege jibchagbadneun dolpal-i singwan-i doeeossda
+#   273571: muhyeob geim-e chiteumodeuleul jeog-yonghaessda
+#   263880: I Became Daddy Long Legs in a Romance Fantasy
 #
 # 5 titles from Япония or Корея (mixed):
 #   16498: 잔여 포인트 999999999999P (Novel) (Корея)
@@ -142,11 +162,12 @@ asyncio.run(main())
 #   231169: Я не ищу связей на одну ночь (Новелла) (Корея)
 #
 # 10 'Боги' titles on page 1:
-#   271058: Kuàichuān gōnglüè: Yāoniè sùzhǔ, kāiguà le
-#   267643: lopan sog haegunjedog-i doeeossda
-#   25089: Jaeang-geub yeong-ungnim-i gwihwanhasyeossda
-#   232975: Jiuri zhi lu
-#   270776: Yongsapati Beorimbadeun Saje
+#   55754: Embers Ad Infinitum (Novel)
+#   262215: The Years of Apocalypse - A Time Loop Progression Fantasy
+#   275322: Quán Zhí Jiàn Xiū
+#   272014: Исчисление судеб
+#   203235: Counterattack System appeared when I'm already At The Mahayana Realm
 #
-# 5 newest titles: ['Salajin sindelella', 'Warden of the Mysteries', 'In all his overwhelming
-# tenacity', 'Ekseuteoui 2hoechaneun Goemul Baeuda', 'Avatar: The Rise of Kyoshi']
+# 5 newest titles: ['chin-aehaneun naui eonniege', 'cheonjaelanyo, jadongsanyang-indeyo',
+# 'gom inhyeong-i bulmyeonjeung agdang-eul kkumnalalo bonaem', 'Игры мафиози',
+# 'Imsinsikyeotdeoni Hwangnyeoyeotda']

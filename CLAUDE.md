@@ -78,7 +78,7 @@ async with RanobeLib(
 from ranobelib import Catalog
 
 async with Catalog() as catalog:
-    page = await catalog.list_titles(query="dxd", genres=[34], status=1, sort="rate_avg")
+    page = await catalog.list_titles(query="dxd", genres=[34], statuses=[1], sort="rate_avg")
     for title in page.items:                # list[Title] — та же модель, что get_info()
         print(title.name)
     if page.has_next_page:
@@ -115,7 +115,7 @@ async with Catalog() as catalog:
    расширение, если понадобится.
 8. Листинг/поиск по каталогу (не по одному тайтлу — заголовки issue #38: "catalog listing
    isn't naturally title-scoped") → отдельный класс `Catalog` (не метод `RanobeLib`),
-   `Catalog.list_titles(page=..., query=..., genres=..., status=..., sort=...)` — см.
+   `Catalog.list_titles(page=..., query=..., genres=..., statuses=..., sort=...)` — см.
    roadmap-шаг 24.
 
 `number` уже приходит от API строкой, при необходимости содержащей дробную часть
@@ -1183,5 +1183,27 @@ owner/repo/workflow-file/environment) — это может сделать то�
     - Добавление `last_item_at` в `_INFO_FIELDS` меняет кэш-ключ `get_info()` (в нём
       отсортированный список полей), так что старые записи дискового кэша просто не
       попадают — без ручной инвалидации.
+
+34. **Список статусов и фильтр по нескольким статусам** (issue #68, снова
+    `ranobelib-companion` — группа «Статус» с мультиселект-чипами в мобильных фильтрах
+    каталога; номер 34, т.к. 33 занят `Title.last_chapter_at` из issue #67).
+    - Проверено (см. `docs/api-notes.md`, раздел "Status list and multiple statuses"):
+      `GET /api/constants?fields[]=status` — та же не заскоупленная по сайту форма с
+      `site_ids`, что и `fields[]=genres`/`types`; 5 статусов, все для ranobelib (`1`
+      "Онгоинг", `2` "Завершён", `3` "Анонс", `4` "Приостановлен", `5` "Выпуск прекращён"),
+      лейблы совпадают с `Title.status`. Повторный `status[]` — **OR**, как `types[]`
+      (`[1, 2]` → и онгоинги, и завершённые).
+    - `Catalog.list_statuses(*, refresh=False) -> list[Label]` — та же модель, что
+      `Title.status`, как и предлагал issue (отдельная модель "статус каталога" не
+      заводится, тот же принцип, что `Genre` в шаге 25); фильтр по `site_ids`, содержащим
+      `3`, тот же, что у `list_genres()`/`list_countries()` (сейчас ничего не отсекает, но
+      эндпоинт не заскоуплен по сайту). Кэш — `DiskCache`, ключ `"catalog:statuses"`.
+    - `status: int | None` заменён на `statuses: list[int] | None` целиком, без
+      deprecated-алиаса, который предлагал issue — то же решение, что и `country` →
+      `countries` в шаге 29 (проект не держит параллельные параметры ради обратной
+      совместимости). Ломающее изменение публичного API — отметить в описании релиза.
+    - `Label` ре-экспортирован из `ranobelib/__init__.py` и добавлен в `docs/reference.md` —
+      тот же принцип, что у `Genre`/`Country`: нужен вызывающему для аннотации
+      возвращаемого значения `list_statuses()`.
 
 Каждый пункт — отдельная ветка/PR по правилам из раздела Git workflow.
