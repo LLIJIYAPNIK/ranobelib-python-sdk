@@ -22,6 +22,7 @@ async def test_get_info_returns_title_metadata() -> None:
     assert info.summary
     assert info.chapter_count is not None
     assert info.chapter_count > 0
+    assert info.last_chapter_at is not None
     assert info.genres
     assert info.teams
 

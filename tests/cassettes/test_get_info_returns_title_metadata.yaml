@@ -5,49 +5,56 @@ interactions:
       accept:
       - application/json
       accept-encoding:
-      - gzip, deflate
+      - gzip, deflate, br
       connection:
       - keep-alive
       host:
       - api.cdnlibs.org
+      origin:
+      - https://ranobelib.me
+      referer:
+      - https://ranobelib.me/
       site-id:
       - '3'
       user-agent:
-      - python-httpx/0.28.1
+      - Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15
+        (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1
     method: GET
-    uri: https://api.cdnlibs.org/api/manga/91443--new-hero-in-dxd?fields%5B%5D=background&fields%5B%5D=eng_name&fields%5B%5D=otherNames&fields%5B%5D=summary&fields%5B%5D=releaseDate&fields%5B%5D=genres&fields%5B%5D=tags&fields%5B%5D=teams&fields%5B%5D=authors&fields%5B%5D=artists&fields%5B%5D=chap_count
+    uri: https://api.cdnlibs.org/api/manga/91443--new-hero-in-dxd?fields%5B%5D=background&fields%5B%5D=eng_name&fields%5B%5D=otherNames&fields%5B%5D=summary&fields%5B%5D=releaseDate&fields%5B%5D=genres&fields%5B%5D=tags&fields%5B%5D=teams&fields%5B%5D=authors&fields%5B%5D=artists&fields%5B%5D=chap_count&fields%5B%5D=last_item_at
   response:
     body:
       string: !!binary |
-        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
-        5urvLdTFb+rh4R/rI4n3NxQAAA==
+        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
+        AAA=
     headers:
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-origin:
+      - https://ranobelib.me
       cache-control:
       - no-cache, private
       connection:
@@ -59,31 +66,28 @@ interactions:
       content-type:
       - application/json
       date:
-      - Wed, 05 Aug 2026 13:27:44 GMT
+      - Sun, 04 Oct 2026 12:48:59 GMT
       keep-alive:
       - timeout=60
       server:
       - ddos-guard
       set-cookie:
-      - __ddg8_=Z3P2JR9E2AZqRMQL; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
-        13:47:43 GMT
-      - __ddg10_=1785936463; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
-        13:47:43 GMT
-      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
-        13:47:43 GMT
-      - __ddg1_=sWEGu3s0GI0wR1JrGd1A; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Thu,
-        05-Aug-2027 13:27:43 GMT
+      - __ddg8_=0RFkajPxiLLs84FJ; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:08:59 GMT
+      - __ddg10_=1791118139; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:08:59 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:08:59 GMT
+      - __ddg1_=zS3o68qYrdji2I1VXIAx; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Mon,
+        04-Oct-2027 12:48:59 GMT
       transfer-encoding:
       - chunked
       vary:
-      - Accept-Encoding
-      - Origin
+      - Origin, Accept-Encoding
       x-ratelimit-limit:
       - '100'
       x-ratelimit-remaining:
       - '99'
-      x-xss-protection:
-      - 1; mode=block
     status:
       code: 200
       message: OK
