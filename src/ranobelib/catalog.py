@@ -86,6 +86,8 @@ class Catalog:
         tags: list[int] | None = None,
         statuses: list[int] | None = None,
         countries: list[int] | None = None,
+        min_chapters: int | None = None,
+        max_chapters: int | None = None,
         sort: str = DEFAULT_SORT,
         refresh: bool = False,
     ) -> CatalogPage:
@@ -119,6 +121,11 @@ class Catalog:
                 parameter, not a ``country``/``countries[]`` one — see docs/api-notes.md for
                 why (``Country`` mirrors the API's own "type" concept, which isn't strictly
                 limited to literal countries).
+            min_chapters: Only titles with at least this many chapters (inclusive). Counts
+                the same number as ``Title.chapter_count`` (uploaded chapters). ``None``
+                (the default) applies no lower bound.
+            max_chapters: Only titles with at most this many chapters (inclusive). ``None``
+                (the default) applies no upper bound.
             sort: Sort order. Despite the name, this is sent as the API's ``sort_by``
                 parameter — an actual ``sort`` parameter exists but is silently ignored by
                 the API (see docs/api-notes.md). Known accepted values: ``"name"``,
@@ -133,14 +140,25 @@ class Catalog:
             page exists.
 
         Raises:
-            ValueError: If ``page`` is less than 1, or ``per_page`` is outside
-                ``MIN_PER_PAGE..MAX_PER_PAGE``.
+            ValueError: If ``page`` is less than 1, ``per_page`` is outside
+                ``MIN_PER_PAGE..MAX_PER_PAGE``, ``min_chapters``/``max_chapters`` is
+                negative, or ``min_chapters`` is greater than ``max_chapters``.
         """
         if page < 1:
             raise ValueError(f"page must be at least 1, got {page}.")
         if not MIN_PER_PAGE <= per_page <= MAX_PER_PAGE:
             raise ValueError(
                 f"per_page must be between {MIN_PER_PAGE} and {MAX_PER_PAGE}, got {per_page}."
+            )
+        for name, value in (("min_chapters", min_chapters), ("max_chapters", max_chapters)):
+            if value is not None and value < 0:
+                raise ValueError(f"{name} must be at least 0, got {value}.")
+        if min_chapters is not None and max_chapters is not None and min_chapters > max_chapters:
+            # The API itself silently swaps the bounds instead (see docs/api-notes.md) —
+            # raising here rather than relying on that undocumented behavior.
+            raise ValueError(
+                f"min_chapters ({min_chapters}) must not be greater than "
+                f"max_chapters ({max_chapters})."
             )
 
         key = _cache_key(
@@ -151,6 +169,8 @@ class Catalog:
             tags=tags,
             statuses=statuses,
             countries=countries,
+            min_chapters=min_chapters,
+            max_chapters=max_chapters,
             sort=sort,
         )
         if not refresh:
@@ -166,6 +186,8 @@ class Catalog:
             tags=tags,
             statuses=statuses,
             countries=countries,
+            min_chapters=min_chapters,
+            max_chapters=max_chapters,
             sort=sort,
         )
         self._cache.set(key, data)
@@ -263,6 +285,8 @@ def _cache_key(
     tags: list[int] | None,
     statuses: list[int] | None,
     countries: list[int] | None,
+    min_chapters: int | None,
+    max_chapters: int | None,
     sort: str,
 ) -> str:
     genres_part = ",".join(str(genre_id) for genre_id in genres or [])
@@ -271,7 +295,7 @@ def _cache_key(
     countries_part = ",".join(str(country_id) for country_id in countries or [])
     return (
         f"catalog:{page}:{per_page}:{query or ''}:{genres_part}:{tags_part}:"
-        f"{statuses_part}:{countries_part}:{sort}"
+        f"{statuses_part}:{countries_part}:{min_chapters}:{max_chapters}:{sort}"
     )
 
 

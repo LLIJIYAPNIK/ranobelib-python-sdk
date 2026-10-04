@@ -155,6 +155,36 @@ async def test_list_titles_rejects_per_page_out_of_range(per_page: int) -> None:
             await catalog.list_titles(per_page=per_page)
 
 
+@pytest.mark.parametrize(
+    "bounds",
+    [{"min_chapters": -1}, {"max_chapters": -1}, {"min_chapters": 500, "max_chapters": 100}],
+)
+async def test_list_titles_rejects_invalid_chapter_bounds(bounds: dict[str, int]) -> None:
+    async with Catalog() as catalog:
+        with pytest.raises(ValueError, match="chapters"):
+            await catalog.list_titles(**bounds)
+
+
+@pytest.mark.vcr
+async def test_list_titles_chapter_bounds_are_inclusive() -> None:
+    async with Catalog() as catalog:
+        # 6712 (High School DxD, completed) has exactly 308 chapters — see
+        # examples/01_title_metadata.py's expected output. Catalog items don't carry a chapter
+        # count (see docs/api-notes.md), so a title known to sit exactly on both bounds is
+        # the check.
+        page = await catalog.list_titles(min_chapters=308, max_chapters=308, per_page=60)
+
+    assert any(item.id == 6712 for item in page.items)
+
+
+@pytest.mark.vcr
+async def test_list_titles_min_chapters_above_every_title_matches_nothing() -> None:
+    async with Catalog() as catalog:
+        page = await catalog.list_titles(min_chapters=99_999_999, per_page=10)
+
+    assert page.items == []
+
+
 @pytest.mark.vcr
 async def test_list_genres_returns_genres_with_id_and_name() -> None:
     async with Catalog() as catalog:
