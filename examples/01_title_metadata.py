@@ -30,6 +30,12 @@ async def main() -> None:
         # Total chapter count as reported by the site itself, not computed by the SDK.
         print(info.chapter_count)
 
+        # When the most recent chapter was published, as a timezone-aware (UTC) datetime —
+        # the same value the catalog's sort="last_chapter_at" orders by. Only get_info()
+        # fills this in: Catalog.list_titles() items leave it None, because the catalog
+        # listing endpoint doesn't return it (see docs/api-notes.md, "Last chapter date").
+        print(info.last_chapter_at)
+
         # `genres` is a list of Genre models; slicing keeps the printed output short.
         print([genre.name for genre in info.genres[:5]])
 
@@ -42,4 +48,5 @@ asyncio.run(main())
 # Старшая школа D×D (Новелла)
 # Завершён
 # 308
+# 2026-07-09 13:29:40+00:00
 # ['Боевик', 'Боевые искусства', 'Вампиры', 'Гарем', 'Драма']
