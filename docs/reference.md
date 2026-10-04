@@ -24,6 +24,8 @@
 
 ::: ranobelib.Country
 
+::: ranobelib.Label
+
 ## Exceptions
 
 ::: ranobelib.RanobeLibError

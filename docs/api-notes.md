@@ -629,7 +629,7 @@ while probing, not otherwise used by this SDK): `tags`, `status`, `types`,
 `imageServers` — each 403-free the same way `genres` is. Not investigated further; noted
 here in case a future feature needs one of them (same "don't guess, check first" principle
 as this whole section). (`types` was picked up later for issue #48, see "Country/origin
-filter" below; `tags` still isn't used for anything beyond the filter parameter itself, see
+filter" below, and `status` for issue #68, see "Status filter" below; `tags` still isn't used for anything beyond the filter parameter itself, see
 next.)
 
 **Tag filter — `tags[]`, AND semantics, same as genres (issue #50):**
@@ -710,7 +710,31 @@ requesting `status[]=1` and checking every returned item's `status.id == 1`. Obs
 the wild: `1` ("В процессе"/ongoing), `2` ("Завершён"/completed), `4`, `5` (labels not fully
 sampled). Same as genres, an unrecognized id (`status[]=99`) is **422** here though (`"The
 selected status.0 is invalid."`) — unlike `genres[]`, this one *is* validated against a
-whitelist server-side, just not one this SDK has catalogued.
+whitelist server-side.
+
+**Status list and multiple statuses — `fields[]=status`, OR semantics (issue #68, checked
+2026-10-04):**
+
+Issue #68 (companion app's mobile catalog filters: a «Статус» group of multi-select chips)
+asked for an id → label list, like `list_genres()`/`list_countries()`, and for filtering by
+several statuses at once.
+
+- The whitelist above is `GET /api/constants?fields[]=status`: same network-wide,
+  `site_ids`-tagged shape as `fields[]=genres`/`fields[]=types` (a `Site-Id` header changes
+  nothing about the response). As of this writing, 5 entries, all tagged for ranobelib.me:
+  `1` "Онгоинг", `2` "Завершён", `3` "Анонс", `4` "Приостановлен", `5` "Выпуск прекращён"
+  (`4`/`5` are tagged `site_ids: [0, 1, 2, 3, 4]`, i.e. not for site 5, `1`-`3` for all
+  sites). The labels match `Title.status.label` for the same ids (each `status[]=<id>` alone
+  returned only titles with that `status.id`/`label`), and `6`/`99` are the 422 above, so
+  the list is the full set. `Catalog.list_statuses()` filters by `site_ids` containing `3`
+  anyway, same as the other two lists — today that drops nothing, but the endpoint isn't
+  site-scoped, so it could.
+- Repeated `status[]` is **OR**, like `types[]`: `status[]=1&status[]=2` (`limit=60`,
+  `sort_by=name`) returns both ongoing and completed titles (46 + 14), `status[]=2&status[]=4`
+  both completed and paused. Expected, since a title has exactly one status.
+- `Catalog.list_titles()`'s `status: int | None` was replaced outright with
+  `statuses: list[int] | None` — not kept as a deprecated alias, same call as `country` →
+  `countries` in issue #55 below. `None` or an empty list omits `status[]` entirely.
 
 **Country/origin filter — `types[]`, not `country`/`countries[]` (issue #48):**
 
