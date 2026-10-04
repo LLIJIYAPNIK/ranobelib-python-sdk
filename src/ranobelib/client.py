@@ -191,6 +191,8 @@ class ApiClient:
         tags: list[int] | None,
         statuses: list[int] | None,
         countries: list[int] | None,
+        min_chapters: int | None,
+        max_chapters: int | None,
         sort: str,
     ) -> dict[str, Any]:
         """Fetch one page of the catalog listing/search results.
@@ -217,6 +219,8 @@ class ApiClient:
                 country, confirmed against the live API, see docs/api-notes.md). Sent on the
                 wire as repeated ``types[]`` parameters — the API's own name for this concept
                 is "type", not "country" (see docs/api-notes.md).
+            min_chapters: Minimum chapter count, inclusive. Sent as ``chap_count_min``.
+            max_chapters: Maximum chapter count, inclusive. Sent as ``chap_count_max``.
             sort: Forwarded as the API's ``sort_by`` parameter, not ``sort`` — the API
                 silently ignores an actual ``sort`` parameter (see docs/api-notes.md); this
                 mismatch between the SDK's public keyword and the wire parameter name is
@@ -241,6 +245,10 @@ class ApiClient:
             params.append(("status[]", str(status_id)))
         for country_id in countries or []:
             params.append(("types[]", str(country_id)))
+        if min_chapters is not None:
+            params.append(("chap_count_min", str(min_chapters)))
+        if max_chapters is not None:
+            params.append(("chap_count_max", str(max_chapters)))
 
         response = await self._get("/manga", params=httpx.QueryParams(params))
         self._raise_for_status(
