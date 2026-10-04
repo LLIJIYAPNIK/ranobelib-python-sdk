@@ -1,7 +1,14 @@
 """Unit tests for ranobelib.catalog: helpers, plus Catalog construction (no network)."""
 
-from ranobelib.catalog import Catalog, _build_countries, _build_genres, _build_page, _cache_key
-from ranobelib.models import CatalogPage, Country, Genre, Title
+from ranobelib.catalog import (
+    Catalog,
+    _build_countries,
+    _build_genres,
+    _build_page,
+    _build_statuses,
+    _cache_key,
+)
+from ranobelib.models import CatalogPage, Country, Genre, Label, Title
 
 _TITLE_ITEM = {
     "id": 1,
@@ -44,7 +51,7 @@ def test_cache_key_differs_by_page() -> None:
         query=None,
         genres=None,
         tags=None,
-        status=None,
+        statuses=None,
         countries=None,
         sort="name",
     )
@@ -54,7 +61,7 @@ def test_cache_key_differs_by_page() -> None:
         query=None,
         genres=None,
         tags=None,
-        status=None,
+        statuses=None,
         countries=None,
         sort="name",
     )
@@ -62,14 +69,14 @@ def test_cache_key_differs_by_page() -> None:
     assert key1 != key2
 
 
-def test_cache_key_differs_by_query_genres_tags_status_countries_and_sort() -> None:
+def test_cache_key_differs_by_query_genres_tags_statuses_countries_and_sort() -> None:
     base = _cache_key(
         page=1,
         per_page=30,
         query=None,
         genres=None,
         tags=None,
-        status=None,
+        statuses=None,
         countries=None,
         sort="name",
     )
@@ -80,7 +87,7 @@ def test_cache_key_differs_by_query_genres_tags_status_countries_and_sort() -> N
         query="dxd",
         genres=None,
         tags=None,
-        status=None,
+        statuses=None,
         countries=None,
         sort="name",
     )
@@ -90,7 +97,7 @@ def test_cache_key_differs_by_query_genres_tags_status_countries_and_sort() -> N
         query=None,
         genres=[34],
         tags=None,
-        status=None,
+        statuses=None,
         countries=None,
         sort="name",
     )
@@ -100,7 +107,7 @@ def test_cache_key_differs_by_query_genres_tags_status_countries_and_sort() -> N
         query=None,
         genres=None,
         tags=[218],
-        status=None,
+        statuses=None,
         countries=None,
         sort="name",
     )
@@ -110,7 +117,7 @@ def test_cache_key_differs_by_query_genres_tags_status_countries_and_sort() -> N
         query=None,
         genres=None,
         tags=None,
-        status=1,
+        statuses=[1, 2],
         countries=None,
         sort="name",
     )
@@ -120,7 +127,7 @@ def test_cache_key_differs_by_query_genres_tags_status_countries_and_sort() -> N
         query=None,
         genres=None,
         tags=None,
-        status=None,
+        statuses=None,
         countries=[10],
         sort="name",
     )
@@ -130,7 +137,7 @@ def test_cache_key_differs_by_query_genres_tags_status_countries_and_sort() -> N
         query=None,
         genres=None,
         tags=None,
-        status=None,
+        statuses=None,
         countries=None,
         sort="views",
     )
@@ -143,7 +150,7 @@ def test_cache_key_stable_for_equivalent_calls() -> None:
         query="dxd",
         genres=[1, 2],
         tags=[218],
-        status=1,
+        statuses=[1, 2],
         countries=[10, 11],
         sort="name",
     )
@@ -153,7 +160,7 @@ def test_cache_key_stable_for_equivalent_calls() -> None:
         query="dxd",
         genres=[1, 2],
         tags=[218],
-        status=1,
+        statuses=[1, 2],
         countries=[10, 11],
         sort="name",
     )
@@ -205,6 +212,29 @@ def test_build_countries_drops_countries_not_tagged_for_ranobelib() -> None:
 
 def test_build_countries_handles_empty_results() -> None:
     assert _build_countries([]) == []
+
+
+def test_build_statuses_validates_items_as_label() -> None:
+    data = [{"id": 1, "label": "Онгоинг", "site_ids": [0, 1, 2, 3, 4, 5]}]
+
+    statuses = _build_statuses(data)
+
+    assert statuses == [Label(id=1, label="Онгоинг")]
+
+
+def test_build_statuses_drops_statuses_not_tagged_for_ranobelib() -> None:
+    data = [
+        {"id": 1, "label": "Онгоинг", "site_ids": [0, 1, 2, 3, 4, 5]},
+        {"id": 6, "label": "Other site only", "site_ids": [5]},
+    ]
+
+    statuses = _build_statuses(data)
+
+    assert [status.id for status in statuses] == [1]
+
+
+def test_build_statuses_handles_empty_results() -> None:
+    assert _build_statuses([]) == []
 
 
 async def test_catalog_headers_are_merged_into_the_api_client() -> None:
