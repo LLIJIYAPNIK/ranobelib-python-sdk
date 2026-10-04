@@ -48,6 +48,7 @@ _INFO_FIELDS = [
     "authors",
     "artists",
     "chap_count",
+    "last_item_at",
 ]
 
 

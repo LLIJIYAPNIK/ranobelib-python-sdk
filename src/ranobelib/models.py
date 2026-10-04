@@ -463,6 +463,11 @@ class Title(BaseModel):
     artists: list[Person] = Field(default_factory=list)
     teams: list[Team] = Field(default_factory=list)
     chapter_count: int | None = None
+    last_chapter_at: datetime | None = Field(default=None, alias="last_item_at")
+    """When the most recent chapter was published — the value the catalog's
+    ``sort="last_chapter_at"`` orders by. Only ``RanobeLib.get_info()`` fills it in: the
+    catalog listing endpoint doesn't return it (see docs/api-notes.md), so it's ``None`` on
+    ``Catalog.list_titles()`` items, and on a title with no chapters yet."""
 
     @model_validator(mode="before")
     @classmethod
@@ -581,8 +586,9 @@ class CatalogPage(BaseModel):
     """One page of catalog listing/search results, as returned by ``Catalog.list_titles()``.
 
     ``items`` reuses ``Title`` as-is — a catalog list item has every field ``Title`` requires,
-    the ones it doesn't send (``genres``, ``summary``, ``chapter_count``, ...) just come back
-    at their defaults, same as any other partially-populated ``Title`` (see docs/api-notes.md).
+    the ones it doesn't send (``genres``, ``summary``, ``chapter_count``, ``last_chapter_at``,
+    ...) just come back at their defaults, same as any other partially-populated ``Title``
+    (see docs/api-notes.md).
     """
 
     items: list[Title]

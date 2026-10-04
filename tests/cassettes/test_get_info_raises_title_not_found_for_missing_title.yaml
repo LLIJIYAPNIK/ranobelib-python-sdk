@@ -5,23 +5,32 @@ interactions:
       accept:
       - application/json
       accept-encoding:
-      - gzip, deflate
+      - gzip, deflate, br
       connection:
       - keep-alive
       host:
       - api.cdnlibs.org
+      origin:
+      - https://ranobelib.me
+      referer:
+      - https://ranobelib.me/
       site-id:
       - '3'
       user-agent:
-      - python-httpx/0.28.1
+      - Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15
+        (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1
     method: GET
-    uri: https://api.cdnlibs.org/api/manga/1--this-title-does-not-exist-zzz?fields%5B%5D=background&fields%5B%5D=eng_name&fields%5B%5D=otherNames&fields%5B%5D=summary&fields%5B%5D=releaseDate&fields%5B%5D=genres&fields%5B%5D=tags&fields%5B%5D=teams&fields%5B%5D=authors&fields%5B%5D=artists&fields%5B%5D=chap_count
+    uri: https://api.cdnlibs.org/api/manga/1--this-title-does-not-exist-zzz?fields%5B%5D=background&fields%5B%5D=eng_name&fields%5B%5D=otherNames&fields%5B%5D=summary&fields%5B%5D=releaseDate&fields%5B%5D=genres&fields%5B%5D=tags&fields%5B%5D=teams&fields%5B%5D=authors&fields%5B%5D=artists&fields%5B%5D=chap_count&fields%5B%5D=last_item_at
   response:
     body:
       string: !!binary |
         H4sIAAAAAAAAA6tWSkksSVSyqlYqyU8sLgEzKgtSlayUijNzUvNKlHSUclOLixPTQUJ++SUKbvml
         eSlKtbW1AN/Kzk86AAAA
     headers:
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-origin:
+      - https://ranobelib.me
       cache-control:
       - no-cache, private
       connection:
@@ -33,20 +42,20 @@ interactions:
       content-type:
       - application/json
       date:
-      - Wed, 05 Aug 2026 13:27:44 GMT
+      - Sun, 04 Oct 2026 12:49:00 GMT
       keep-alive:
       - timeout=60
       server:
       - ddos-guard
       set-cookie:
-      - __ddg8_=pSgoztk4w5amSo1c; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
-        13:47:44 GMT
-      - __ddg10_=1785936464; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
-        13:47:44 GMT
-      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Wed, 05-Aug-2026
-        13:47:44 GMT
-      - __ddg1_=9uz6FHbFrRwhfcdlWMSi; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Thu,
-        05-Aug-2027 13:27:44 GMT
+      - __ddg8_=6VkgokIyyZP0PxxM; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:09:00 GMT
+      - __ddg10_=1791118140; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:09:00 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:09:00 GMT
+      - __ddg1_=3HZDuRFldrjuYfXdixf6; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Mon,
+        04-Oct-2027 12:49:00 GMT
       transfer-encoding:
       - chunked
       vary:
