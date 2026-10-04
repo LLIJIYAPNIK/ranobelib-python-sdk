@@ -206,6 +206,37 @@ So `Title.last_chapter_at` is filled in by `RanobeLib.get_info()` only, and stay
 per page) was considered and left out: a hidden N+1 on a listing call, with the rate limit
 that comes with it, is a caller-visible cost the SDK shouldn't take on implicitly.
 
+#### Chapter count on listing items: also not available (issue #74, checked 2026-10-04)
+
+Issue #74 asked for `chapter_count` alongside `last_chapter_at` on `Catalog.list_titles()`
+items, and named two places the probe above hadn't looked: whatever ranobelib.me's own
+catalog page sends, and a batch endpoint. Both checked, and the answer is **no**: the listing
+can't return either value.
+
+- **The site's catalog request.** Read from the site's JS bundle (the store that loads the
+  catalog grid): it calls `GET /manga` with the filter params plus exactly
+  `fields: ["rate", "rate_avg", "userBookmark"]`, and nothing else. The site's catalog cards
+  don't show a chapter count or a date. Where the site does show a chapter count for a
+  catalog entry, in the hover popup, it fetches the title on its own
+  (`GET /manga/{slug}` with `fields: ["genres", "tags", "releaseDate", "summary",
+  "status_id", "chap_count"]`), one request per hovered card. So the site itself does
+  per-title requests, on demand.
+- **`fields[]` on the listing, re-probed.** `chap_count` (the name that gives `items_count` on
+  the title endpoint), `items_count`, `itemsCount`, `chapters_count`, `chaptersCount`,
+  `count_chapters`, `chap_count_uploaded`, `items_count_uploaded`, `uploaded`, `items`,
+  `latest_items`, `last_items`, `stats`, `counters`, `info`, `status_id`, `type`, `format`
+  all return 422. The accepted ones haven't changed (`metadata`, `moderated`, `created_at`,
+  `releaseDate`, `rate`, `rate_avg`, `userBookmark`). None of them has a chapter count.
+- **Batch lookup.** `GET /api/manga` ignores `ids[]`, `id[]`, and `slugs[]`: it returns the
+  normal unfiltered page, so it can't be used to fetch "these 30 titles" in one request.
+  `GET /api/latest-updates` does have `items_count` and `last_item_at` on every item, but it
+  can't be filtered (see above). It's the home page's update feed, not something that covers
+  an arbitrary catalog page.
+
+`chapter_count` and `last_chapter_at` stay `None` on `Catalog.list_titles()` items. The only
+way to get them for a catalog page is one `get_info()` per title, which is the N+1 that issue
+#74 itself rules out.
+
 ### Title URL / slug format
 
 A title URL like `https://ranobelib.me/ru/book/91443--new-hero-in-dxd` (locale prefix is
