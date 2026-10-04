@@ -148,7 +148,7 @@ Confirmed against a real title (`91443--new-hero-in-dxd`) with
 ```
 GET /api/manga/{slug_url}?fields[]=background&fields[]=eng_name&fields[]=otherNames
     &fields[]=summary&fields[]=releaseDate&fields[]=genres&fields[]=tags&fields[]=teams
-    &fields[]=authors&fields[]=artists&fields[]=chap_count
+    &fields[]=authors&fields[]=artists&fields[]=chap_count&fields[]=last_item_at
 ```
 
 Notes on individual fields, since the mapping from requested `fields[]` name to response key
@@ -157,6 +157,9 @@ is not always 1:1:
 - `chap_count` does **not** add a `chap_count` key — it surfaces `items_count: {"uploaded":
   int, "total": int}` instead. `uploaded` is the actual number of published chapters; this is
   what the SDK's `Title.chapter_count` is populated from.
+- `last_item_at` adds a `last_item_at` ISO timestamp — when the most recent chapter was
+  published; the SDK's `Title.last_chapter_at`. See "Last chapter date" below for how it was
+  verified and why the catalog listing can't provide it.
 - `status_id` (not currently requested by the SDK) surfaces `scanlateStatus: {"id", "label"}`
   — the *translation* status (e.g. "Заброшен" / abandoned by the team), distinct from the
   title's own `status` field (e.g. "Онгоинг" / ongoing), which is present by default without
@@ -168,6 +171,40 @@ is not always 1:1:
 - Fields present without being requested: `id`, `name`, `rus_name`, `eng_name`, `model`,
   `slug`, `slug_url`, `cover`, `ageRestriction`, `site`, `type`, `is_licensed`,
   `content_marking`, `status`, `releaseDateString`.
+
+### Last chapter date: `last_item_at` (issue #67, checked 2026-10-04)
+
+Issue #67 asked for the date of a title's most recent chapter on `Title`, mainly for
+`Catalog.list_titles()` items (catalog cards showing "обновлён <дата>").
+
+- **Title endpoint — available.** `GET /api/manga/{slug_url}?fields[]=last_item_at` adds
+  `last_item_at` (ISO timestamp, UTC). Not present by default. Checked that it's really the
+  latest chapter's date: on `6712--high-school-dxd-novel` (308 chapters) and
+  `91443--new-hero-in-dxd` (47 chapters) it equals the newest `branches[].created_at` across
+  the title's whole `/chapters` list, to the second. It's also the value the catalog's
+  `sort_by=last_chapter_at` orders by: the first six results of that sort, looked up one by
+  one, came back in strictly descending `last_item_at` order. Requested by `get_info()`,
+  surfaced as `Title.last_chapter_at`.
+- **Catalog listing (`GET /api/manga`) — not available.** Unlike the title endpoint, the
+  listing *validates* `fields[]`: an unknown value is a 422 (`"Выбранное значение для fields.0
+  ошибочно."`, no list of allowed values). Rejected: `last_item_at`, `last_chapter_at`,
+  `lastChapterAt`, `last_chapter`, `lastItemAt`, `last_item`, `updated_at`, `chap_count`,
+  `items_count`, `chapters`, `latest_chapter`, `new_chapters`, `views`, and ~30 other
+  guesses. Accepted, and none of them carry the date: `metadata` (only shiki/anilist sync
+  timestamps, even with `sort_by=last_chapter_at`), `created_at` (the *title's* creation
+  date), `releaseDate`, `moderated`, `rate`/`rate_avg`, `userBookmark`. The site's own
+  catalog cards don't show a date either — its JS bundle only reads `last_item_at` in the
+  home page's "latest updates" block.
+- **`GET /api/latest-updates` — available, but not a catalog.** Items carry `last_item_at`,
+  `items_count`, and `metadata.latest_items: {"count": N, "items": [...]}` — the site renders
+  `count - 1` as "+ ещё N глав" (the "+N" badge the issue's nice-to-have asked about). It
+  paginates (`page=2` gives different items) but ignores `genres[]`, `q`, `limit`,
+  `per_page`, so it can't stand in for `list_titles()`. Not wrapped by the SDK.
+
+So `Title.last_chapter_at` is filled in by `RanobeLib.get_info()` only, and stays `None` on
+`Catalog.list_titles()` items. Fetching it per item (one title request per catalog row, ~30
+per page) was considered and left out: a hidden N+1 on a listing call, with the rate limit
+that comes with it, is a caller-visible cost the SDK shouldn't take on implicitly.
 
 ### Title URL / slug format
 
@@ -847,8 +884,8 @@ get a valid, just not stably-paginated, response.
 `slug_url`, `cover`, `ageRestriction`, `status`) and nothing that conflicts with it — confirmed
 by running `Title.model_validate()` on a real captured item. Fields `Title` defines with
 defaults but that this endpoint doesn't send (`genres`, `tags`, `authors`, `artists`, `teams`,
-`summary`, `release_date`, `chapter_count`, ...) just come back empty/`None`, same as any other
-optional field — no separate "catalog list item" model needed, matching the issue's explicit
+`summary`, `release_date`, `chapter_count`, `last_chapter_at` — see "Last chapter date"
+above, ...) just come back empty/`None`, same as any other optional field — no separate "catalog list item" model needed, matching the issue's explicit
 ask to reuse `Title`. Extra fields this endpoint sends that `Title` doesn't model (`rating`,
 `content_marking`, `site`, `releaseDateString`) are ignored by pydantic, same as everywhere
 else in the SDK. `type` used to be in this list too, until issue #48 (see "Country/origin

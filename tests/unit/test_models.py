@@ -1,5 +1,6 @@
 """Unit tests for ranobelib.models."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 from ranobelib.models import Country, Title
@@ -64,6 +65,7 @@ RAW_TITLE: dict[str, Any] = {
     "content_marking": [],
     "status": {"id": 1, "label": "Онгоинг"},
     "items_count": {"uploaded": 47, "total": 0},
+    "last_item_at": "2022-02-23T13:26:48.000000Z",
     "scanlateStatus": {"id": 4, "label": "Забросили"},
     "artists": [],
     "releaseDateString": "2021 г.",
@@ -110,6 +112,12 @@ def test_title_model_chapter_count_is_none_without_items_count() -> None:
     assert title.chapter_count is None
 
 
+def test_title_model_parses_last_item_at_as_last_chapter_at() -> None:
+    title = Title.model_validate(RAW_TITLE)
+
+    assert title.last_chapter_at == datetime(2022, 2, 23, 13, 26, 48, tzinfo=UTC)
+
+
 def test_title_model_summary_none_stays_none() -> None:
     raw = {**RAW_TITLE, "summary": None}
 
@@ -141,6 +149,7 @@ def test_title_model_handles_missing_optional_fields() -> None:
 
     assert title.summary is None
     assert title.chapter_count is None
+    assert title.last_chapter_at is None
     assert title.other_names == []
     assert title.genres == []
     assert title.country is None
