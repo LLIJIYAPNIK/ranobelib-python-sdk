@@ -53,6 +53,8 @@ def test_cache_key_differs_by_page() -> None:
         tags=None,
         statuses=None,
         countries=None,
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
     key2 = _cache_key(
@@ -63,13 +65,15 @@ def test_cache_key_differs_by_page() -> None:
         tags=None,
         statuses=None,
         countries=None,
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
 
     assert key1 != key2
 
 
-def test_cache_key_differs_by_query_genres_tags_statuses_countries_and_sort() -> None:
+def test_cache_key_differs_by_every_filter_and_sort() -> None:
     base = _cache_key(
         page=1,
         per_page=30,
@@ -78,6 +82,8 @@ def test_cache_key_differs_by_query_genres_tags_statuses_countries_and_sort() ->
         tags=None,
         statuses=None,
         countries=None,
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
 
@@ -89,6 +95,8 @@ def test_cache_key_differs_by_query_genres_tags_statuses_countries_and_sort() ->
         tags=None,
         statuses=None,
         countries=None,
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
     assert base != _cache_key(
@@ -99,6 +107,8 @@ def test_cache_key_differs_by_query_genres_tags_statuses_countries_and_sort() ->
         tags=None,
         statuses=None,
         countries=None,
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
     assert base != _cache_key(
@@ -109,6 +119,8 @@ def test_cache_key_differs_by_query_genres_tags_statuses_countries_and_sort() ->
         tags=[218],
         statuses=None,
         countries=None,
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
     assert base != _cache_key(
@@ -119,6 +131,8 @@ def test_cache_key_differs_by_query_genres_tags_statuses_countries_and_sort() ->
         tags=None,
         statuses=[1, 2],
         countries=None,
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
     assert base != _cache_key(
@@ -129,6 +143,8 @@ def test_cache_key_differs_by_query_genres_tags_statuses_countries_and_sort() ->
         tags=None,
         statuses=None,
         countries=[10],
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
     assert base != _cache_key(
@@ -139,7 +155,45 @@ def test_cache_key_differs_by_query_genres_tags_statuses_countries_and_sort() ->
         tags=None,
         statuses=None,
         countries=None,
+        min_chapters=None,
+        max_chapters=None,
         sort="views",
+    )
+    assert base != _cache_key(
+        page=1,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=None,
+        statuses=None,
+        countries=None,
+        min_chapters=100,
+        max_chapters=None,
+        sort="name",
+    )
+    # The same number as an upper instead of a lower bound is a different query.
+    assert _cache_key(
+        page=1,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=None,
+        statuses=None,
+        countries=None,
+        min_chapters=100,
+        max_chapters=None,
+        sort="name",
+    ) != _cache_key(
+        page=1,
+        per_page=30,
+        query=None,
+        genres=None,
+        tags=None,
+        statuses=None,
+        countries=None,
+        min_chapters=None,
+        max_chapters=100,
+        sort="name",
     )
 
 
@@ -152,6 +206,8 @@ def test_cache_key_stable_for_equivalent_calls() -> None:
         tags=[218],
         statuses=[1, 2],
         countries=[10, 11],
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
     key2 = _cache_key(
@@ -162,6 +218,8 @@ def test_cache_key_stable_for_equivalent_calls() -> None:
         tags=[218],
         statuses=[1, 2],
         countries=[10, 11],
+        min_chapters=None,
+        max_chapters=None,
         sort="name",
     )
 

@@ -1,0 +1,115 @@
+interactions:
+- request:
+    body: ''
+    headers:
+      accept:
+      - application/json
+      accept-encoding:
+      - gzip, deflate, br
+      connection:
+      - keep-alive
+      host:
+      - api.cdnlibs.org
+      origin:
+      - https://ranobelib.me
+      referer:
+      - https://ranobelib.me/
+      site-id:
+      - '3'
+      user-agent:
+      - Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15
+        (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1
+    method: GET
+    uri: https://api.cdnlibs.org/api/manga?site_id%5B%5D=3&page=1&limit=60&sort_by=last_chapter_at&chap_count_min=308&chap_count_max=308
+  response:
+    body:
+      string: !!binary |
+        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
+        dGgzAAA=
+    headers:
+      access-control-allow-credentials:
+      - 'true'
+      access-control-allow-origin:
+      - https://ranobelib.me
+      cache-control:
+      - no-cache, private
+      connection:
+      - keep-alive
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - upgrade-insecure-requests;
+      content-type:
+      - application/json
+      date:
+      - Sun, 04 Oct 2026 13:13:19 GMT
+      keep-alive:
+      - timeout=60
+      server:
+      - ddos-guard
+      set-cookie:
+      - __ddg8_=KE4C7djrxEgsssix; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:33:18 GMT
+      - __ddg10_=1791119598; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:33:18 GMT
+      - __ddg9_=80.242.56.154; Domain=.cdnlibs.org; Path=/; Expires=Sun, 04-Oct-2026
+        13:33:18 GMT
+      - __ddg1_=B2l7WIGrHVmjGSt9Rr1u; Domain=.cdnlibs.org; HttpOnly; Path=/; Expires=Mon,
+        04-Oct-2027 13:13:18 GMT
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding
+      - Origin
+      x-ratelimit-limit:
+      - '100'
+      x-ratelimit-remaining:
+      - '96'
+      x-xss-protection:
+      - 1; mode=block
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -111,6 +111,8 @@ _CATALOG_CALL_KWARGS: dict[str, Any] = {
     "tags": None,
     "statuses": None,
     "countries": None,
+    "min_chapters": None,
+    "max_chapters": None,
     "sort": "last_chapter_at",
 }
 
@@ -295,6 +297,8 @@ async def test_list_titles_sends_expected_query_params() -> None:
         assert request.url.params.get_list("tags[]") == ["218", "232"]
         assert request.url.params.get_list("status[]") == ["1", "2"]
         assert request.url.params.get_list("types[]") == ["10", "11"]
+        assert request.url.params["chap_count_min"] == "100"
+        assert request.url.params["chap_count_max"] == "500"
         return httpx.Response(200, json={"data": [], "meta": {}})
 
     async with _client(handler) as client:
@@ -306,6 +310,8 @@ async def test_list_titles_sends_expected_query_params() -> None:
             tags=[218, 232],
             statuses=[1, 2],
             countries=[10, 11],
+            min_chapters=100,
+            max_chapters=500,
             sort="last_chapter_at",
         )
 
@@ -317,6 +323,8 @@ async def test_list_titles_omits_optional_params_when_not_given() -> None:
         assert "tags[]" not in request.url.params
         assert "status[]" not in request.url.params
         assert "types[]" not in request.url.params
+        assert "chap_count_min" not in request.url.params
+        assert "chap_count_max" not in request.url.params
         return httpx.Response(200, json={"data": [], "meta": {}})
 
     async with _client(handler) as client:
@@ -328,6 +336,8 @@ async def test_list_titles_omits_optional_params_when_not_given() -> None:
             tags=None,
             statuses=None,
             countries=None,
+            min_chapters=None,
+            max_chapters=None,
             sort="name",
         )
 
@@ -347,6 +357,8 @@ async def test_list_titles_returns_full_response_body() -> None:
             tags=None,
             statuses=None,
             countries=None,
+            min_chapters=None,
+            max_chapters=None,
             sort="name",
         )
 
@@ -367,6 +379,8 @@ async def test_list_titles_raises_rate_limit_error_on_429() -> None:
                 tags=None,
                 statuses=None,
                 countries=None,
+                min_chapters=None,
+                max_chapters=None,
                 sort="name",
             )
 
@@ -385,6 +399,8 @@ async def test_list_titles_wraps_validation_error_in_ranobelib_error() -> None:
                 tags=None,
                 statuses=None,
                 countries=None,
+                min_chapters=None,
+                max_chapters=None,
                 sort="bogus",
             )
 
@@ -434,6 +450,8 @@ async def test_list_titles_sends_countries_as_repeated_types_query_param() -> No
             tags=None,
             statuses=None,
             countries=[10, 11],
+            min_chapters=None,
+            max_chapters=None,
             sort="name",
         )
 
@@ -452,6 +470,8 @@ async def test_list_titles_sends_tags_query_param() -> None:
             tags=[218],
             statuses=None,
             countries=None,
+            min_chapters=None,
+            max_chapters=None,
             sort="name",
         )
 
