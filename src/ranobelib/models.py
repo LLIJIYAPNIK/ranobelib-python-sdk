@@ -463,6 +463,9 @@ class Title(BaseModel):
     artists: list[Person] = Field(default_factory=list)
     teams: list[Team] = Field(default_factory=list)
     chapter_count: int | None = None
+    """Number of uploaded chapters. Only ``RanobeLib.get_info()`` fills it in: the catalog
+    listing endpoint doesn't return it (see docs/api-notes.md), so it's ``None`` on
+    ``Catalog.list_titles()`` items."""
     last_chapter_at: datetime | None = Field(default=None, alias="last_item_at")
     """When the most recent chapter was published — the value the catalog's
     ``sort="last_chapter_at"`` orders by. Only ``RanobeLib.get_info()`` fills it in: the
